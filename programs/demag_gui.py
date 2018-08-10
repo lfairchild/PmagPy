@@ -25,14 +25,18 @@ AUTHORS
 # LOG HEADER:
 # ============================================================================================
 #
-# Demag_GUI Version 0.33 add interpretation editor, plane plotting functionality and more
-# propose merging development fork to main PmagPy repository by Kevin Gaastra (11/09/2015)
+# Demag_GUI Version 0.33 add interpretation editor, plane plotting
+# functionality and more propose merging development fork to main PmagPy
+# repository by Kevin Gaastra (11/09/2015)
 #
-# Demag_GUI Version 0.32 added multiple interpretations and new plot functionality by Kevin Gaastra (05/03/2015)
+# Demag_GUI Version 0.32 added multiple interpretations and new plot
+# functionality by Kevin Gaastra (05/03/2015)
 #
-# Demag_GUI Version 0.31 save MagIC tables option: add dialog box to choose coordinates system for pmag_specimens.txt 04/26/2015
+# Demag_GUI Version 0.31 save MagIC tables option: add dialog box to
+# choose coordinates system for pmag_specimens.txt 04/26/2015
 #
-# Demag_GUI Version 0.30 fix backward compatibility with strange pmag_specimens.txt 01/29/2015
+# Demag_GUI Version 0.30 fix backward compatibility with strange
+# pmag_specimens.txt 01/29/2015
 #
 # Demag_GUI Version 0.29 fix on_close_event 23/12/2014
 #
@@ -1085,10 +1089,15 @@ class Demag_GUI(wx.Frame):
         self.zijdblock_steps = self.Data[self.s]['zijdblock_steps']
         self.vds = self.Data[self.s]['vds']
 
-        self.zijplot.plot(self.CART_rot_good[:, 0], -1*self.CART_rot_good[:, 1], 'ro-',
-                          markersize=self.MS, clip_on=False, picker=True, zorder=1)  # x,y or N,E
-        self.zijplot.plot(self.CART_rot_good[:, 0], -1*self.CART_rot_good[:, 2], 'bs-',
-                          markersize=self.MS, clip_on=False, picker=True, zorder=1)  # x-z or N,D
+        # pdb.set_trace()
+
+        print(type(self.CART_rot_good), self.CART_rot_good.shape)
+        cartrotgood = open("cartrot", "a")
+        cartrotgood.write("\n\n"+ self.s)
+        cartrotgood.write(str(self.CART_rot_good))
+        cartrotgood.close()
+        self.zijplot.plot(self.CART_rot_good[:,0], -1*self.CART_rot_good[:,1], 'ro-', markersize=self.MS, clip_on=False, picker=True, zorder=1) #x,y or N,E
+        self.zijplot.plot(self.CART_rot_good[:,0], -1*self.CART_rot_good[:,2], 'bs-', markersize=self.MS, clip_on=False, picker=True, zorder=1) #x-z or N,D
 
         for i in range(len(self.CART_rot_bad)):
             self.zijplot.plot(self.CART_rot_bad[:, 0][i], -1 * self.CART_rot_bad[:, 1][i], 'o', mfc='None',
@@ -3287,7 +3296,7 @@ class Demag_GUI(wx.Frame):
             self.site = ""
 
         if self.Data and reset_interps:
-            self.update_pmag_tables()
+            self.get_interpretations3()
 
         if self.ie_open:
             self.ie.specimens_list = self.specimens
@@ -3788,27 +3797,24 @@ class Demag_GUI(wx.Frame):
         # ------------------------------------------------
 
         # All meas data information is stored in Data[secimen]={}
-        Data = {}
-        Data_hierarchy = {}
-        Data_hierarchy['study'] = {}
-        Data_hierarchy['locations'] = {}
-        Data_hierarchy['sites'] = {}
-        Data_hierarchy['samples'] = {}
-        Data_hierarchy['specimens'] = {}
-        Data_hierarchy['sample_of_specimen'] = {}
-        Data_hierarchy['site_of_specimen'] = {}
-        Data_hierarchy['site_of_sample'] = {}
-        Data_hierarchy['location_of_site'] = {}
-        Data_hierarchy['location_of_specimen'] = {}
-        Data_hierarchy['study_of_specimen'] = {}
-        Data_hierarchy['expedition_name_of_specimen'] = {}
+        Data={}
+        Data_hierarchy={}
+        Data_hierarchy['study']={}
+        Data_hierarchy['locations']={}
+        Data_hierarchy['sites']={}
+        Data_hierarchy['samples']={}
+        Data_hierarchy['specimens']={}
+        Data_hierarchy['sample_of_specimen']={}
+        Data_hierarchy['site_of_specimen']={}
+        Data_hierarchy['site_of_sample']={}
+        Data_hierarchy['location_of_site']={}
+        Data_hierarchy['location_of_specimen']={}
+        Data_hierarchy['study_of_specimen']={}
+        Data_hierarchy['expedition_name_of_specimen']={}
 
-        if self.data_model == 3:
+        if int(self.data_model)==3:
 
-            if self.con.tables['measurements'].df.empty:
-                self.user_warning(
-                    "Measurement data file is empty and the GUI cannot start, aborting")
-                return Data, Data_hierarchy
+            if self.con.tables['measurements'].df.empty: self.user_warning("Measurement data file is empty and the GUI cannot start, aborting"); return Data,Data_hierarchy
 
             if 'sample' not in self.spec_data.columns or 'sample' not in self.samp_data.columns:
                 if 'specimen' not in self.spec_data.columns:
