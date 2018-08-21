@@ -1434,7 +1434,9 @@ class MagicDataFrame(object):
         else:
             print('adding measurement column to measurements table!')
             self.df['measurement'] = self.df['experiment'] + self.df['treat_step_num'].apply(treat_step)
-            self.write_magic_file()
+            # this is calling write_magic with no arguments; writes to CWD by
+            # default; commenting out
+            # self.write_magic_file()
 
 
 
@@ -2027,9 +2029,15 @@ class MagicDataFrame(object):
             output file name
         """
         # don't let custom name start with "./"
+        # TODO: This breaks cit2magic which relies on the custom name variable
+        # to write to relative paths <08-15-18, Luke Fairchild> #
+        # (actually wasn't the issue I was having, but still might be a
+        # necessary change?)
         if custom_name:
             if custom_name.startswith('.'):
-                custom_name = os.path.split(custom_name)[1]
+                cust_dir, custom_name = os.path.split(custom_name)
+                if cust_dir != '.':
+                    dir_path = os.path.realpath(cust_dir)
         # put columns in logical order (by group)
         self.sort_dataframe_cols()
         # if indexing column was put in, remove it
