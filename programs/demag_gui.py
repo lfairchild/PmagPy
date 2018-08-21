@@ -327,6 +327,7 @@ class Demag_GUI(wx.Frame):
         self.GUI_RESOLUTION = min(r1, r2, 1)
         top_bar_2v_space = 5
         top_bar_h_space = 10
+        self.top_bar_h_space = top_bar_h_space
         spec_button_space = 10
         side_bar_v_space = 10
 
@@ -667,27 +668,27 @@ class Demag_GUI(wx.Frame):
     # ----------------------------------------------------------------------
         # Warnings TextCtrl
     # ----------------------------------------------------------------------
-        warning_sizer = wx.StaticBoxSizer(wx.StaticBox(
+        self.warning_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Current Data Warnings"), wx.VERTICAL)
 
         self.warning_box = wx.TextCtrl(self.panel, id=wx.ID_ANY, size=(50*self.GUI_RESOLUTION, 50 + 2*top_bar_2v_space),
                                        value="No Problems", style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL, name="warning_box")
         self.warning_box.SetHelpText(dgh.warning_help)
 
-        warning_sizer.Add(self.warning_box, 1, wx.TOP | wx.EXPAND)
+        self.warning_sizer.Add(self.warning_box, 1, wx.TOP | wx.EXPAND)
 
     # ----------------------------------------------------------------------
         # Design the panel
     # ----------------------------------------------------------------------
 
         # Top Bar-----------------------------------------------------------
-        top_bar_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.top_bar_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         bounds_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Bounds"), wx.VERTICAL)
         bounds_sizer.AddMany([(self.tmin_box, 1, wx.ALIGN_TOP | wx.EXPAND | wx.BOTTOM, top_bar_2v_space),
                               (self.tmax_box, 1, wx.ALIGN_BOTTOM | wx.EXPAND | wx.TOP, top_bar_2v_space)])
-        top_bar_sizer.Add(bounds_sizer, 1, wx.ALIGN_LEFT)
+        self.top_bar_sizer.Add(bounds_sizer, 1, wx.ALIGN_LEFT)
 
         fit_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Interpretation Options"), wx.VERTICAL)
@@ -699,34 +700,34 @@ class Demag_GUI(wx.Frame):
                            wx.ALIGN_LEFT | wx.EXPAND),
                           (self.delete_fit_button, 1, wx.ALIGN_BOTTOM | wx.ALIGN_LEFT | wx.EXPAND)])
         fit_sizer.Add(fit_grid, 1, wx.EXPAND)
-        top_bar_sizer.Add(fit_sizer, 2, wx.ALIGN_LEFT |
+        self.top_bar_sizer.Add(fit_sizer, 2, wx.ALIGN_LEFT |
                           wx.LEFT, top_bar_h_space)
 
         fit_type_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Interpretation Type"), wx.VERTICAL)
         fit_type_sizer.AddMany([(self.PCA_type_box, 1, wx.ALIGN_TOP | wx.EXPAND | wx.BOTTOM, top_bar_2v_space),
                                 (self.plane_display_box, 1, wx.ALIGN_BOTTOM | wx.EXPAND | wx.TOP, top_bar_2v_space)])
-        top_bar_sizer.Add(fit_type_sizer, 1, wx.ALIGN_LEFT |
+        self.top_bar_sizer.Add(fit_type_sizer, 1, wx.ALIGN_LEFT |
                           wx.LEFT, top_bar_h_space)
 
-        top_bar_sizer.Add(box_sizer_specimen_stat, 3,
+        self.top_bar_sizer.Add(box_sizer_specimen_stat, 3,
                           wx.ALIGN_LEFT | wx.LEFT, top_bar_h_space)
 
         level_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Display Level"), wx.VERTICAL)
         level_sizer.AddMany([(self.level_box, 1, wx.ALIGN_TOP | wx.EXPAND | wx.BOTTOM, top_bar_2v_space),
                              (self.level_names, 1, wx.ALIGN_BOTTOM | wx.EXPAND | wx.TOP, top_bar_2v_space)])
-        top_bar_sizer.Add(level_sizer, 1, wx.ALIGN_LEFT |
+        self.top_bar_sizer.Add(level_sizer, 1, wx.ALIGN_LEFT |
                           wx.LEFT, top_bar_h_space)
 
         mean_options_sizer = wx.StaticBoxSizer(wx.StaticBox(
             self.panel, wx.ID_ANY, "Mean Options"), wx.VERTICAL)
         mean_options_sizer.AddMany([(self.mean_type_box, 1, wx.ALIGN_TOP | wx.EXPAND | wx.BOTTOM, top_bar_2v_space),
                                     (self.mean_fit_box, 1, wx.ALIGN_BOTTOM | wx.EXPAND | wx.TOP, top_bar_2v_space)])
-        top_bar_sizer.Add(mean_options_sizer, 1,
+        self.top_bar_sizer.Add(mean_options_sizer, 1,
                           wx.ALIGN_LEFT | wx.LEFT, top_bar_h_space)
 
-        top_bar_sizer.Add(warning_sizer, 2, wx.ALIGN_LEFT |
+        self.top_bar_sizer.Add(self.warning_sizer, 2, wx.ALIGN_LEFT |
                           wx.LEFT, top_bar_h_space)
 
         # Side Bar------------------------------------------------------------
@@ -777,7 +778,7 @@ class Demag_GUI(wx.Frame):
         full_plots_sizer.Add(eqarea_MM0_stats_sizer, 1.5,
                              wx.ALIGN_RIGHT | wx.EXPAND)
 
-        self.panel.SetSizerAndFit(top_bar_sizer)
+        self.panel.SetSizerAndFit(self.top_bar_sizer)
         self.side_panel.SetSizerAndFit(side_bar_sizer)
         self.scrolled_panel.SetSizer(full_plots_sizer)
 
@@ -1089,13 +1090,6 @@ class Demag_GUI(wx.Frame):
         self.zijdblock_steps = self.Data[self.s]['zijdblock_steps']
         self.vds = self.Data[self.s]['vds']
 
-        # pdb.set_trace()
-
-        print(type(self.CART_rot_good), self.CART_rot_good.shape)
-        cartrotgood = open("cartrot", "a")
-        cartrotgood.write("\n\n"+ self.s)
-        cartrotgood.write(str(self.CART_rot_good))
-        cartrotgood.close()
         self.zijplot.plot(self.CART_rot_good[:,0], -1*self.CART_rot_good[:,1], 'ro-', markersize=self.MS, clip_on=False, picker=True, zorder=1) #x,y or N,E
         self.zijplot.plot(self.CART_rot_good[:,0], -1*self.CART_rot_good[:,2], 'bs-', markersize=self.MS, clip_on=False, picker=True, zorder=1) #x-z or N,D
 
@@ -4357,7 +4351,7 @@ class Demag_GUI(wx.Frame):
         data_er_ages = {}
 
         if self.data_model == 3.0:
-            print(("data model: %1.1f" % (self.data_model)))
+            # print(("data model: %1.1f" % (self.data_model)))
             Data_info["er_samples"] = []
             Data_info["er_sites"] = []
             Data_info["er_locations"] = []
