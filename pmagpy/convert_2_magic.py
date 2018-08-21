@@ -1195,9 +1195,9 @@ def cit(dir_path=".", input_dir_path="", magfile="", user="", meas_file="measure
         info = Lines[1].split()
         volmass = float(info[-1])
         if volmass == 1.0:
-            print('Warning: Specimen volume set to 1.0.')
-            print('Warning: If volume/mass really is 1.0, set volume/mass to 1.001')
-            print('Warning: specimen method code LP-NOMAG set.')
+            print('-W- Specimen volume set to 1.0.')
+            print('-W- If volume/mass really is 1.0, set volume/mass to 1.001')
+            print('-W- specimen method code LP-NOMAG set.')
             SpecRec['weight'] = ""
             SpecRec['volume'] = ""
             SpecRec['method_codes'] = 'LP-NOMAG'
@@ -1214,7 +1214,7 @@ def cit(dir_path=".", input_dir_path="", magfile="", user="", meas_file="measure
             SpecRec['weight'] = ""
             SpecRec['volume'] = '%10.3e' % (volmass)
         else:
-            print('Warning: Unknown normalization unit ',
+            print('-W- Unknown normalization unit ',
                   norm, '. Using default of cc')
             SpecRec['weight'] = ""
             SpecRec['volume'] = '%10.3e' % (volmass*1e-6)
