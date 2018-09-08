@@ -3055,9 +3055,8 @@ class Demag_GUI(wx.Frame):
                         elif "dec" in list(pars.keys()) and "inc" in list(pars.keys()):
                             dec, inc, direction_type = pars["dec"], pars["inc"], 'l'
                         else:
-                            print(
-                                ("-E- ERROR: can't find mean for specimen interpertation: %s , %s" % (element, fit.name)))
-                            print(pars)
+                            print("-E- ERROR: can't find mean for specimen interpertation: %s , %s" % (element, fit.name))
+                            # print(pars)
                             continue
                         # add for calculation
                         pars_for_mean[fit.name].append({'dec': float(dec), 'inc': float(
@@ -3065,8 +3064,7 @@ class Demag_GUI(wx.Frame):
                         pars_for_mean["All"].append({'dec': float(dec), 'inc': float(
                             inc), 'direction_type': direction_type, 'element_name': element})
                     except KeyError:
-                        print(
-                            ("KeyError in calculate_high_level_mean for element: " + str(element)))
+                        print("KeyError in calculate_high_level_mean for element: " + str(element))
                         continue
             else:
                 try:
@@ -6192,7 +6190,7 @@ class Demag_GUI(wx.Frame):
             elif calculation_type == "DE-BFP":
                 PCA_type = "plane"
             else:
-                print("no PCA type found setting to line")
+                print("-W- No PCA type found; setting to line")
                 PCA_type = "line"
             self.PCA_type_box.SetStringSelection(PCA_type)
 

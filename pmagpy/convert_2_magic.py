@@ -1423,8 +1423,10 @@ def cit(dir_path=".", input_dir_path="", magfile="", user="", meas_file="measure
         custom_name=site_file, dir_path=output_dir_path)
     con.tables['locations'].write_magic_file(
         custom_name=loc_file, dir_path=output_dir_path)
-    con.tables['measurements'].write_magic_file(
+    measurements_out = con.tables['measurements'].write_magic_file(
         custom_name=meas_file, dir_path=output_dir_path)
+    if type(measurements_out) is bool and not measurements_out:
+        return False, meas_file
 
     return True, meas_file
 
