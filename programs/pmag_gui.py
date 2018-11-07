@@ -7,7 +7,7 @@ print("-I- Importing Pmag GUI dependencies")
 #set_env.set_backend(wx=True)
 import matplotlib
 if not matplotlib.get_backend() == 'WXAgg':
-    matplotlib.use('WXAgg')
+    matplotlib.use('WXAgg', warn=False)
 import wx
 import wx.lib.buttons as buttons
 import wx.lib.newevent as newevent
@@ -52,7 +52,11 @@ class MagMainFrame(wx.Frame):
         self.icon = wx.Icon()
         icon_path = os.path.join(PMAGPY_DIRECTORY, 'programs', 'images', 'PmagPy.ico')
         if os.path.isfile(icon_path):
-            self.icon.CopyFromBitmap(wx.Bitmap(icon_path, wx.BITMAP_TYPE_ANY))
+            self.icon.LoadFile(icon_path, wx.BITMAP_TYPE_ANY)
+            if 'darwin' in sys.platform:
+                from wx.adv import TaskBarIcon, TBI_DOCK
+                self.taskicon = TaskBarIcon(wx.adv.TBI_DOCK)
+                self.taskicon.SetIcon(self.icon)
             self.SetIcon(self.icon)
         else:
             print("-I- PmagPy icon file not found -- skipping")
