@@ -1364,21 +1364,40 @@ def vspec_magic(data):
     for i in range(k, len(data)):
         FDirdata, Dirdata, DataStateCurr, newstate = [], [], {}, 0
         for key in treats:  # check if anything changed
-            DataStateCurr[key] = data[i][key]
+            DataStateCurr[key] = str(data[i][key])
+            DataState0[key] = str(DataState0[key])
             if DataStateCurr[key].strip() != DataState0[key].strip():
                 newstate = 1  # something changed
+                break
         if newstate == 1:
-            if i == k:  # sample is unique
+            if i == k:  # measurement is unique
                 vdata.append(data[i - 1])
             else:  # measurement is not unique
-                # print "averaging: records " ,k,i
+                meas_in_avg = []
                 for l in range(k - 1, i):
-                    if 'orientation' in data[l]['measurement_description']:
-                        data[l]['measurement_description'] = ""
-                    Dirdata.append([float(data[l]['measurement_dec']), float(
-                        data[l]['measurement_inc']), float(data[l]['measurement_magn_moment'])])
+                    # check if measurement is marked as bad; if so, skip over it
+                    # so it is not included in the averaging
+                    if 'quality' in data[l].keys():
+                        if data[l]['quality'].strip() == 'b':
+                            vdata.append(data[l])
+                            continue
+                    # record the measurement indices that will be included
+                    meas_in_avg.append(l)
+                    if 'orientation' in data[l]['description']:
+                        data[l]['description'] = ""
+                    Dirdata.append([float(data[l]['dir_dec']), float(
+                        data[l]['dir_inc']), float(data[l]['magn_moment'])])
                     FDirdata.append(
-                        [float(data[l]['measurement_dec']), float(data[l]['measurement_inc'])])
+                        [float(data[l]['dir_dec']), float(data[l]['dir_inc'])])
+                if len(meas_in_avg) <= 1:  # only one "good" measurement (or none)
+                    if len(meas_in_avg) == 1:
+                        vdata.append(data[meas_in_avg[0]])
+                    k = i + 1
+                    continue
+
+                print("-I- averaging records", ", ".join(map(str, meas_in_avg)),
+                      "({}: {})".format(key, data[k][key].strip()),
+                      "for", data[0]["specimen"])
                 dir, R = vector_mean(Dirdata)
                 Fpars = fisher_mean(FDirdata)
                 vrec = data[i - 1]
@@ -1416,12 +1435,16 @@ def vspec_magic3(data):
     vdata, Dirdata, step_meth = [], [], ""
     if len(data) == 0:
         return vdata
-    treat_init = ["treat_temp", "treat_temp_decay_rate", "treat_temp_dc_on", "treat_temp_dc_off", "treat_ac_field", "treat_ac_field_decay_rate", "treat_ac_field_dc_on",
-                  "treat_ac_field_dc_off", "treat_dc_field", "treat_dc_field_decay_rate", "treat_dc_field_ac_on", "treat_dc_field_ac_off", "treat_dc_field_phi", "treat_dc_field_theta"]
+    treat_init = ["treat_temp", "treat_temp_decay_rate", "treat_temp_dc_on",
+                  "treat_temp_dc_off", "treat_ac_field",
+                  "treat_ac_field_decay_rate", "treat_ac_field_dc_on",
+                  "treat_ac_field_dc_off", "treat_dc_field",
+                  "treat_dc_field_decay_rate", "treat_dc_field_ac_on",
+                  "treat_dc_field_ac_off", "treat_dc_field_phi",
+                  "treat_dc_field_theta"]
     treats = []
-#
-# find keys that are used
-#
+
+    # find keys that are used
     for key in treat_init:
         if key in list(data[0].keys()):
             treats.append(key)  # get a list of keys
@@ -1440,23 +1463,40 @@ def vspec_magic3(data):
     for i in range(k, len(data)):
         FDirdata, Dirdata, DataStateCurr, newstate = [], [], {}, 0
         for key in treats:  # check if anything changed
-            DataStateCurr[key] = data[i][key]
-            DataStateCurr[key] = str(DataStateCurr[key])
+            DataStateCurr[key] = str(data[i][key])
             DataState0[key] = str(DataState0[key])
             if DataStateCurr[key].strip() != DataState0[key].strip():
                 newstate = 1  # something changed
+                break
         if newstate == 1:
-            if i == k:  # sample is unique
+            if i == k:  # measurement is unique
                 vdata.append(data[i - 1])
             else:  # measurement is not unique
-                # print "averaging: records " ,k,i
+                meas_in_avg = []
                 for l in range(k - 1, i):
+                    # check if measurement is marked as bad; if so, skip over it
+                    # so it is not included in the averaging
+                    if 'quality' in data[l].keys():
+                        if data[l]['quality'].strip() == 'b':
+                            vdata.append(data[l])
+                            continue
+                    # record the measurement indices that will be included
+                    meas_in_avg.append(l)
                     if 'orientation' in data[l]['description']:
                         data[l]['description'] = ""
                     Dirdata.append([float(data[l]['dir_dec']), float(
                         data[l]['dir_inc']), float(data[l]['magn_moment'])])
                     FDirdata.append(
                         [float(data[l]['dir_dec']), float(data[l]['dir_inc'])])
+                if len(meas_in_avg) <= 1:  # only one "good" measurement (or none)
+                    if len(meas_in_avg) == 1:
+                        vdata.append(data[meas_in_avg[0]])
+                    k = i + 1
+                    continue
+
+                print("-I- averaging records", ", ".join(map(str, meas_in_avg)),
+                      "({}: {})".format(key, data[k][key].strip()),
+                      "for", data[0]["specimen"])
                 dir, R = vector_mean(Dirdata)
                 Fpars = fisher_mean(FDirdata)
                 vrec = data[i - 1]
@@ -11066,7 +11106,7 @@ def vocab_convert(vocab, standard, key=''):
     Example:
     vocab_convert('Egypt','GEOMAGIA') will return '1'
     """
-	
+
     places_to_geomagia = {
         'Egypt':                 "1",
         'Japan':                 "2",

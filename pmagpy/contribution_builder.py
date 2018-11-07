@@ -99,7 +99,7 @@ class Contribution(object):
         data_container = MagicDataFrame(dtype=dtype, columns=col_names, groups=groups)
         self.tables[dtype] = data_container
 
-    def add_magic_table_from_data(self, dtype, data):
+    def add_magic_table_from_data(self, dtype, data, meas_overwrite=False):
         """
         Add a MagIC table to the contribution from a data list
 
@@ -111,7 +111,7 @@ class Contribution(object):
             data list with format [{'key1': 'val1', ...}, {'key1': 'val2', ...}, ... }]
         """
         self.tables[dtype] = MagicDataFrame(dtype=dtype, data=data)
-        if dtype == 'measurements':
+        if dtype == 'measurements' and not meas_overwrite:
             self.tables['measurements'].add_sequence()
         return dtype, self.tables[dtype]
 
