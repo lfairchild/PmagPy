@@ -76,7 +76,7 @@ from time import time
 from datetime import datetime
 import wx
 import wx.lib.scrolledpanel
-from numpy import vstack, sqrt, arange, array, pi, cos, sin, mean, exp, linspace, convolve, nan
+from numpy import vstack, sqrt, arange, array, pi, cos, sin, mean, exp, linspace, convolve, nan, unique
 from matplotlib import rcParams
 from matplotlib.figure import Figure
 from scipy.optimize import curve_fit
@@ -450,8 +450,10 @@ class Demag_GUI(wx.Frame):
         # Create text_box for presenting the measurements
     # ----------------------------------------------------------------------
 
-        self.logger = wx.ListCtrl(self.side_panel, id=wx.ID_ANY, size=(
-            100*self.GUI_RESOLUTION, 100*self.GUI_RESOLUTION), style=wx.LC_REPORT)
+        self.logger = wx.ListCtrl(self.side_panel, id=wx.ID_ANY,
+                                  size=(100*self.GUI_RESOLUTION,
+                                        100*self.GUI_RESOLUTION),
+                                  style=wx.LC_REPORT)
         self.logger.SetFont(font1)
         self.logger.InsertColumn(0, 'i', width=25*self.GUI_RESOLUTION)
         self.logger.InsertColumn(1, 'Step', width=25*self.GUI_RESOLUTION)
@@ -930,6 +932,9 @@ class Demag_GUI(wx.Frame):
 
         m_coords = menu_edit.AppendSubMenu(menu_coordinates, "&Coordinate Systems")
 
+        m_avg_meas = menu_edit.Append(-1, "&Average Measurements", "")
+        self.Bind(wx.EVT_MENU, self.average_measurements, m_avg_meas)
+
         # -----------------
         # Analysis Menu
         # -----------------
@@ -1107,15 +1112,44 @@ class Demag_GUI(wx.Frame):
             self.zijplot.plot(self.CART_rot_bad[:, 0][i], -1 * self.CART_rot_bad[:, 2][i], 's', mfc='None',
                               mec=self.inc_MEC, markersize=self.MS, clip_on=False, picker=False)  # x-z or N,D
 
+        self.zijplot_annotations = []
+        zijplot_annotations_text = []
+        for t in self.zijdblock_steps:
+            if t.endswith("C"):
+                zijplot_annotations_text.append(t.replace("C", "$\degree$C"))
+            elif t=="0":
+                zijplot_annotations_text.append("NRM")
+            else:
+                zijplot_annotations_text.append(t)
+        for i in range(len(self.zijdblock_steps)):
+            ann_inc = self.zijplot.text(self.CART_rot[i][0],
+                                  -self.CART_rot[i][2],
+                                  "  %s" % (zijplot_annotations_text[i]),
+                                  fontsize=8*self.GUI_RESOLUTION,
+                                  color='gray', ha='left', va='center')  # inc
+            ann_inc.set_visible(False)
+            ann_dec = self.zijplot.text(self.CART_rot[i][0],
+                                  -self.CART_rot[i][1],
+                                  "  %s" % (zijplot_annotations_text[i]),
+                                  fontsize=8*self.GUI_RESOLUTION,
+                                  color='gray', ha='left', va='center')  # inc
+            ann_dec.set_visible(False)
+            self.zijplot_annotations.append([ann_inc, ann_dec])
         if self.preferences['show_Zij_treatments']:
             for i in range(len(self.zijdblock_steps)):
                 if int(self.preferences['show_Zij_treatments_steps']) != 1:
-                    if i != 0 and (i+1) % int(self.preferences['show_Zij_treatments_steps']) == 0:
-                        self.zijplot.text(self.CART_rot[i][0], -1*self.CART_rot[i][2], "  %s" % (
-                            self.zijdblock_steps[i]), fontsize=8*self.GUI_RESOLUTION, color='gray', ha='left', va='center')  # inc
+                    # if i != 0 and (i+1) % int(self.preferences['show_Zij_treatments_steps']) == 0:
+                    if i % int(self.preferences['show_Zij_treatments_steps']) == 0:
+                        if not self.preferences['show_Zij_treatments_dec_only']:
+                            self.zijplot_annotations[i][0].set_visible(True)
+                        if not self.preferences['show_Zij_treatments_inc_only']:
+                            self.zijplot_annotations[i][1].set_visible(True)
                 else:
-                    self.zijplot.text(self.CART_rot[i][0], -1*self.CART_rot[i][2], "  %s" % (
-                        self.zijdblock_steps[i]), fontsize=10*self.GUI_RESOLUTION, color='gray', ha='left', va='center')  # inc
+                    if i != 0 and (i+1) % int(self.preferences['show_Zij_treatments_steps']) == 0:
+                        if not self.preferences['show_Zij_treatments_dec_only']:
+                            self.zijplot_annotations[i][0].set_visible(True)
+                        if not self.preferences['show_Zij_treatments_inc_only']:
+                            self.zijplot_annotations[i][1].set_visible(True)
 
         # -----
 
@@ -1171,19 +1205,30 @@ class Demag_GUI(wx.Frame):
         axyline, = self.zijplot.plot([0, 0], [ymin, ymax], **props)
         axyline.set_clip_on(False)
 
-        TEXT1, TEXT2 = "", ""
         if self.COORDINATE_SYSTEM == 'specimen':
-            TEXT1, TEXT2 = " y", "      z"
+            TEXT1, TEXT2 = " y", "     z"
         else:
             if self.ORTHO_PLOT_TYPE == 'N-S':
                 TEXT1, TEXT2 = " E", "     D"
             elif self.ORTHO_PLOT_TYPE == 'E-W':
                 TEXT1, TEXT2 = " S", "     D"
             else:
-                TEXT1, TEXT2 = " y", "      z"
+                TEXT1, TEXT2 = " y", "     z"
+        # # self.zijplot.text(0, ymin,
+        # #                   r"\textcolor{red}{S}, \textcolor{blue}{D}",
+        # #                   fontsize=10, va="top")
+        # # trans_text = self.zijplot.transData
+        # # initial value of xycoords
+        # ex="data"
+        # for s,c in zip([TEXT1, ", ", TEXT2], [TEXT1_clr, "k", TEXT2_clr]):
+        #     axis_labels = self.zijplot.text(0, ymin, s, xycoords=ex,
+        #                                     fontsize=10, color=c, va='top',
+        #                                     ha='right')
+        #     ex = axis_labels.get_window_extent
+        #     # trans_text = transforms.offset_copy(axis_labels._transform, x=ex.width, units='dots')
         self.zijplot.text(0, ymin, TEXT1, fontsize=10,
                           color='r', verticalalignment='top')
-        self.zijplot.text(0, ymin, '    ,', fontsize=10,
+        self.zijplot.text(0, ymin, '   , ', fontsize=10,
                           color='k', verticalalignment='top')
         self.zijplot.text(0, ymin, TEXT2, fontsize=10,
                           color='b', verticalalignment='top')
@@ -1440,10 +1485,8 @@ class Demag_GUI(wx.Frame):
         self.selected_meas_artists = []
         x, y, z = self.CART_rot[self.selected_meas,
                                 0], self.CART_rot[self.selected_meas, 1], self.CART_rot[self.selected_meas, 2]
-        self.selected_meas_artists.append(self.zijplot.scatter(
-            x, -1*y, c=red_cover, marker='o', s=MS_selected, zorder=2))
-        self.selected_meas_artists.append(self.zijplot.scatter(
-            x, -1*z, c=blue_cover, marker='s', s=MS_selected, zorder=2))
+        self.selected_meas_artists.append(self.zijplot.scatter(x, -1*y, c=red_cover, marker='o', s=MS_selected, zorder=2))
+        self.selected_meas_artists.append(self.zijplot.scatter(x, -1*z, c=blue_cover, marker='s', s=MS_selected, zorder=2))
 
         # do down data for eqarea
         x_eq = array([row[0] for i, row in enumerate(self.zij_norm)
@@ -1576,10 +1619,18 @@ class Demag_GUI(wx.Frame):
                         len(self.CART_rot[:, i]) <= tmax_index):
                     self.Add_text()
 
-            self.zijplot.scatter([self.CART_rot[:, 0][tmin_index], self.CART_rot[:, 0][tmax_index]], [-1 * self.CART_rot[:, 1][tmin_index], -
-                                                                                                      1 * self.CART_rot[:, 1][tmax_index]], marker=marker_shape, s=40, facecolor=fit.color, edgecolor='k', zorder=100, clip_on=False)
-            self.zijplot.scatter([self.CART_rot[:, 0][tmin_index], self.CART_rot[:, 0][tmax_index]], [-1 * self.CART_rot[:, 2][tmin_index], -
-                                                                                                      1 * self.CART_rot[:, 2][tmax_index]], marker=marker_shape, s=40, facecolor=fit.color, edgecolor='k', zorder=100, clip_on=False)
+            self.zijplot.scatter([self.CART_rot[:, 0][tmin_index],
+                                  self.CART_rot[:, 0][tmax_index]],
+                                 [-1 * self.CART_rot[:, 1][tmin_index],
+                                  -1 * self.CART_rot[:, 1][tmax_index]],
+                                 marker=marker_shape, s=40, facecolor=fit.color,
+                                 edgecolor='k', zorder=100, clip_on=False)
+            self.zijplot.scatter([self.CART_rot[:, 0][tmin_index],
+                                  self.CART_rot[:, 0][tmax_index]],
+                                 [-1 * self.CART_rot[:, 2][tmin_index],
+                                  -1 * self.CART_rot[:, 2][tmax_index]],
+                                 marker=marker_shape, s=40, facecolor=fit.color,
+                                 edgecolor='k', zorder=100, clip_on=False)
             fit.points[0] = self.zijplot.collections[-1]
             fit.points[1] = self.zijplot.collections[-2]
 
@@ -1773,7 +1824,7 @@ class Demag_GUI(wx.Frame):
                     except IndexError:
                         relability = 'b'
                     if relability == 'b':
-                        self.logger.SetItemBackgroundColour(item, "red")
+                        self.logger.SetItemBackgroundColour(item, wx.Colour(255,0,0,alpha=200))
 
         if problems != {}:
             if 'no bounds' in list(problems.keys()):
@@ -2808,19 +2859,19 @@ class Demag_GUI(wx.Frame):
                     check_duplicates = []
                     warning_issued = []  # keep track of warnings issued to avoid redundant warnings
 
-                    # if within range, attempt to go one additional step beyond
-                    # tmax so that duplicates at the upper bound are caught
+                    # if within range, attempt to go beyond tmax so that
+                    # duplicates at the upper bound are caught
                     if (end_pca + 2) < len(self.Data[self.s]['zijdblock_steps']):
                         check_endpoint = end_pca + 2
                     else:
                         check_endpoint = end_pca + 1
 
-                    for s, f in zip(self.Data[self.s]['zijdblock_steps'][beg_pca:check_endpoint],
-                                    self.Data[self.s]['measurement_flag'][beg_pca:check_endpoint]):
+                    for s, f in zip(self.Data[self.s]['zijdblock_steps'][beg_pca:check_endpoint+1],
+                                    self.Data[self.s]['measurement_flag'][beg_pca:check_endpoint+1]):
                         if f == 'g' and [s, 'g'] in check_duplicates:
                             if s == fit.tmin and s not in warning_issued:
                                 self.warning_text += ("There are multiple good %s " +
-                                                      "steps at the upper bound of Fit %s. The first " +
+                                                      "steps at the lower bound of Fit %s. The first " +
                                                       "measurement will be used as the lower bound.\n") % (
                                                           s, fit.name)
                                 # warning_issued_low.append(s)
@@ -3497,7 +3548,7 @@ class Demag_GUI(wx.Frame):
                          for x in self.Data[specimen]['zijdblock_steps']]
             if tmax == '':
                 tmax = self.Data[specimen]['zijdblock_steps'][-1]
-                print(("No upper bound for fit %s on specimen %s using last step (%s) for upper bound" % (
+                print(("No upper bound fit %s on specimen %s using last step (%s) for upper bound" % (
                     fit.name, specimen, tmax)))
                 if fit != None:
                     fit.tmax = tmax
@@ -3692,7 +3743,7 @@ class Demag_GUI(wx.Frame):
 
         if self.data_model == 3.0:
             mdf = self.con.tables['measurements'].df
-            index = self.Data[self.s]['magic_experiment_name'] + str(g_index+1)
+            index = self.Data[self.s]['magic_experiment_name'] + str(g_index)
             try:
                 mdf.loc[index, 'quality'] = 'g'
             except ValueError:
@@ -3734,7 +3785,9 @@ class Demag_GUI(wx.Frame):
 
         if self.data_model == 3.0:
             mdf = self.con.tables['measurements'].df
-            index = self.Data[self.s]['magic_experiment_name'] + str(g_index+1)
+            # experiment names are zero indexed too...this was previously
+            # g_index+1
+            index = self.Data[self.s]['magic_experiment_name'] + str(g_index)
             try:
                 mdf.loc[index, 'quality'] = 'b'
             except ValueError:
@@ -3784,6 +3837,28 @@ class Demag_GUI(wx.Frame):
             return True
         else:
             return False
+
+    def average_measurements(self, event):
+        avg_warning = """This action will average measurements that
+        were repeated at the same treatment step for each specimen. It will
+        average all measurements that are marked \"good\" (the default label
+        when measurements are first imported).{0}Before continuing, all
+        measurements you wish to exclude from the average must be marked
+        \"bad\". Do you wish to continue?"""
+        cont = self.user_warning(" ".join(l.strip() for l in avg_warning.split()).format("\n\n"))
+        if not cont:
+            return
+        self.con.tables["measurements"].write_magic_file(dir_path=self.WD,
+                                                         custom_name="all_measurements.txt")
+        self.saved_dlg(message="Measurements saved to \"all_measurements.txt\" "
+                       + "prior to averaging")
+        all_meas = self.con.tables["measurements"].convert_to_pmag_data_list()
+        all_meas_ave = pmag.measurements_methods3(all_meas, noave=False)
+        self.con.add_magic_table_from_data(dtype="measurements", data=all_meas_ave,
+                                           meas_overwrite=True)
+        self.con.tables["measurements"].write_magic_file(dir_path=self.WD,
+                                                         append=False)
+        self.reset_backend(warn_user=False)
 
     #---------------------------------------------#
     # Data Read and Location Alteration Functions
@@ -4543,6 +4618,8 @@ class Demag_GUI(wx.Frame):
         preferences['gui_resolution'] = 100.
         preferences['show_Zij_treatments'] = True
         preferences['show_Zij_treatments_steps'] = 2.
+        preferences['show_Zij_treatments_dec_only'] = False
+        preferences['show_Zij_treatments_inc_only'] = False
         preferences['show_eqarea_treatments'] = False
         preferences['auto_save'] = True
         # preferences['show_statistics_on_gui']=["int_n","int_ptrm_n","frac","scat","gmax","b_beta","int_mad","dang","f","fvds","g","q","drats"]#,'ptrms_dec','ptrms_inc','ptrms_mad','ptrms_angle']
@@ -7054,9 +7131,6 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
             self.mark_meas_good(next_i)
             next_i = self.logger.GetNextSelected(next_i)
 
-        pmag.magic_write(os.path.join(
-            self.WD, "magic_measurements.txt"), self.mag_meas_data, "magic_measurements")
-
         self.recalculate_current_specimen_interpreatations()
 
         if self.ie_open:
@@ -7069,9 +7143,6 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
         while next_i != -1:
             self.mark_meas_bad(next_i)
             next_i = self.logger.GetNextSelected(next_i)
-
-        pmag.magic_write(os.path.join(
-            self.WD, "magic_measurements.txt"), self.mag_meas_data, "magic_measurements")
 
         self.recalculate_current_specimen_interpreatations()
 
@@ -7478,14 +7549,14 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
         for i, (x, y) in enumerate(zip(xdata, ydata)):
             if 0 < sqrt((x-xpick_data)**2. + (y-ypick_data)**2.) < e:
                 self.canvas1.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+                sel_index = int(i % len(self.Data[self.s]['zijdblock_steps']))
                 break
         event.Skip()
 
     def on_zijd_select(self, event):
         """
-        Get mouse position on double click find the nearest interpretation
-        to the mouse
-        position then select that interpretation
+        Get mouse position on double click find the nearest interpretation to
+        the mouse position then select that interpretation
 
         Parameters
         ----------
@@ -7567,8 +7638,6 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
                 self.mark_meas_bad(index % len(steps))
             else:
                 self.mark_meas_good(index % len(steps))
-            pmag.magic_write(os.path.join(
-                self.WD, "magic_measurements.txt"), self.mag_meas_data, "magic_measurements")
 
             self.recalculate_current_specimen_interpreatations()
 
@@ -7905,7 +7974,28 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
             tmin_index, tmax_index = self.get_indices(self.current_fit)
 
         TEXT = ""
+        # try:
+        #     logger_view_top_item = self.logger.GetTopItem()
+        #     logger_view_top_pos = self.logger.GetItemPosition(logger_view_top_item)
+        #     logger_view_prev = True
+        # except:
+        #     logger_view_prev = False
+        try:
+            self.logger_prev_pos = self.logger.GetScrollPos(wx.VERTICAL)
+        except:
+            self.logger_prev_pos = None
+        # self.logger.RefreshItems()
         self.logger.DeleteAllItems()
+
+        # quickly check for replicate measurements
+        tr_all = [zijdblock[i][0] for i in range(
+            len(zijdblock)) if self.Data[self.s]['measurement_flag'][i] != 'b']
+        tr_unique = unique(tr_all).tolist()
+        tr_dup = []
+        for t in tr_unique:
+            if tr_all.count(t)>1:
+                tr_dup.append(t)
+
         for i in range(len(zijdblock)):
             lab_treatment = self.Data[self.s]['zijdblock_lab_treatments'][i]
             Step = ""
@@ -7937,8 +8027,14 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
             self.logger.SetItemBackgroundColour(i, "WHITE")
             if i >= tmin_index and i <= tmax_index:
                 self.logger.SetItemBackgroundColour(i, "LIGHT BLUE")
+            if Tr in tr_dup:
+                self.logger.SetItemBackgroundColour(i, wx.Colour(255,255,0,alpha=100))
             if self.Data[self.s]['measurement_flag'][i] == 'b':
-                self.logger.SetItemBackgroundColour(i, "red")
+                self.logger.SetItemBackgroundColour(i, wx.Colour(255,0,0,alpha=200))
+        if self.logger_prev_pos is not None:
+            self.logger.SetScrollPos(wx.VERTICAL,self.logger_prev_pos)
+        # if logger_view_prev:
+        #     self.logger.SetItemPosition(logger_view_top_item,logger_view_top_pos)
 
     def on_click_listctrl(self, event):
         if not self.current_fit:
