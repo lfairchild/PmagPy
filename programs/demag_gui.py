@@ -828,6 +828,9 @@ class Demag_GUI(wx.Frame):
 
         menu_file = wx.Menu()
 
+        m_preferences = menu_file.Append(-1, "&Preferences", "")
+        self.Bind(wx.EVT_MENU, self.edit_preferences, m_preferences)
+
         m_change_WD = menu_file.Append(-1,
                                        "Change Working Directory\tCtrl-W", "")
         self.Bind(wx.EVT_MENU, self.on_menu_change_working_directory, m_change_WD)
@@ -878,6 +881,7 @@ class Demag_GUI(wx.Frame):
         menu_file.AppendSeparator()
         m_exit = menu_file.Append(-1, "E&xit\tCtrl-Q", "Exit")
         self.Bind(wx.EVT_MENU, self.on_menu_exit, m_exit)
+
 
         # -----------------
         # Edit Menu
@@ -1010,6 +1014,7 @@ class Demag_GUI(wx.Frame):
         m_view_VGP = menu_Tools.Append(-1, "&View VGPs\tCtrl-Shift-V", "")
         self.Bind(wx.EVT_MENU, self.on_menu_view_vgps, m_view_VGP)
 
+
         # -----------------
         # Help Menu
         # -----------------
@@ -1033,7 +1038,7 @@ class Demag_GUI(wx.Frame):
 
         # -----------------
 
-        #self.menubar.Append(menu_preferences, "& Preferences")
+        # self.menubar.Append(menu_preferences, "&Preferences")
         self.menubar.Append(menu_file, "&File")
         self.menubar.Append(menu_edit, "&Edit")
         self.menubar.Append(menu_Analysis, "&Analysis")
@@ -4635,6 +4640,14 @@ class Demag_GUI(wx.Frame):
         #            return json.load(pfile)
         return preferences
 
+    def edit_preferences(self, event):
+        dia = demag_dialogs.PreferencesEditor(self)
+        ok = self.show_dlg(dia)
+        if ok == wx.ID_OK:
+            dlg.Destroy()
+        else:
+            dlg.Destroy()
+
     def read_magic_file(self, path, sort_by_this_name):
         """
         reads a magic formated data file from path and sorts the keys
@@ -7995,6 +8008,8 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
         for t in tr_unique:
             if tr_all.count(t)>1:
                 tr_dup.append(t)
+        meth_codes = self.con.tables['measurements'].df['method_codes'][[i for i in self.Data[self.s]['mag_meas_data_index']]].tolist()
+        averaged_index = list(map(lambda x: "DE-VM" in x.split(":"), meth_codes))
 
         for i in range(len(zijdblock)):
             lab_treatment = self.Data[self.s]['zijdblock_lab_treatments'][i]
@@ -8017,7 +8032,10 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
             Inc = zijdblock[i][2]
             Int = zijdblock[i][3]
             csd = self.Data[self.s]['csds'][i]
-            self.logger.InsertItem(i, "%i" % i)
+            if averaged_index[i]:
+                self.logger.InsertItem(i, "%i*" % i)
+            else:
+                self.logger.InsertItem(i, "%i" % i)
             self.logger.SetItem(i, 1, Step)
             self.logger.SetItem(i, 2, "%.1f" % Tr)
             self.logger.SetItem(i, 3, "%.1f" % Dec)
@@ -8025,6 +8043,8 @@ else: self.ie.%s_window.SetBackgroundColour(wx.WHITE)
             self.logger.SetItem(i, 5, "%.2e" % Int)
             self.logger.SetItem(i, 6, csd)
             self.logger.SetItemBackgroundColour(i, "WHITE")
+            # if averaged_index[i]:
+            #     self.logger.SetItemTextColour(i, wx.Colour(0,0,255))
             if i >= tmin_index and i <= tmax_index:
                 self.logger.SetItemBackgroundColour(i, "LIGHT BLUE")
             if Tr in tr_dup:

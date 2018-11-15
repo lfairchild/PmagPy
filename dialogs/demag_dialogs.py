@@ -1510,6 +1510,131 @@ class GBPopupMenu(wx.Menu):
         #print "write_good_bad_magic_measurements"
         print("self.magic_file",self.magic_file)
         pmag.magic_write(self.magic_file,self.mag_meas_data,"magic_measurements")
+
+# GUI user preferences
+        # preferences['gui_resolution'] = 100.
+        # preferences['show_Zij_treatments'] = True
+        # preferences['show_Zij_treatments_steps'] = 2.
+        # preferences['show_Zij_treatments_dec_only'] = False
+        # preferences['show_Zij_treatments_inc_only'] = False
+        # preferences['show_eqarea_treatments'] = False
+        # preferences['auto_save'] = True
+
+
+class PreferencesEditor(wx.Dialog):
+
+    def __init__(self, parent):
+        super(PreferencesEditor, self).__init__(parent, title="User Settings")
+        self.current_prefs = parent.get_preferences()
+        self.InitUI()
+
+    def InitUI(self):
+        self.panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        rb = RadioBox(self.panel, id=ID_ANY, label="Show Zijderveld Steps",
+                      choices=["All", "Inclination only",
+                               "Declination only", "Hide"], majorDimension=0, style=RA_SPECIFY_ROWS)
+        rb.SetSelection(1)
+        # sbs = wx.StaticBoxSizer(wx.StaticBox(self.panel, wx.ID_ANY, 'orientation convention' ), wx.VERTICAL )
+        # sbs = wx.StaticBoxSizer(wx.StaticBox(self.panel, wx.ID_ANY, 'step 1: choose file format'), wx.VERTICAL)
+        # sbs.AddSpacer(5)
+
+        #radio_buttons = []
+        #for fmt in formats:
+        #    radio_button = wx.RadioButton(self.panel, -1, label=fmt, name=fmt)
+        #    radio_buttons.append(radio_button)
+        #    sbs.Add(radio_button, flag=wx.BOTTOM, border=5)
+        #    if len(radio_buttons) == 1:
+        #        sbs.Add(wx.StaticLine(self.panel), 0, wx.ALL|wx.EXPAND, 5)
+        #    #sbs.AddSpacer(5)
+        #    self.Bind(wx.EVT_RADIOBUTTON, self.OnRadioButtonSelect, radio_button)
+
+        # radio_buttons[0].SetValue(True)
+        # self.checked_rb = radio_buttons[0]
+
+        #---------------------
+        # OK/Cancel buttons
+        #---------------------
+
+        hboxok = wx.BoxSizer(wx.HORIZONTAL)
+        self.okButton = wx.Button(self.panel, id=-1, label='Done')
+        self.okButton.SetDefault()
+        self.Bind(wx.EVT_BUTTON, self.on_okButton, self.okButton)
+        self.cancelButton = wx.Button(self.panel, wx.ID_CANCEL, '&Cancel')
+        self.Bind(wx.EVT_BUTTON, self.on_cancelButton, self.cancelButton)
+        self.Bind(wx.EVT_CLOSE, self.on_cancelButton)
+        # re-do the 'quit' binding so that it only closes the current window
+        # self.parent.Bind(wx.EVT_MENU, lambda event: self.parent.menubar.on_quit(event, self), self.parent.menubar.file_quit)
+
+        hboxok.Add(self.okButton)
+        hboxok.AddSpacer(20)
+        hboxok.Add(self.cancelButton )
+        hboxok.AddSpacer(20)
+        hboxok.Add(self.nextButton )
+
+        #-----------------------
+        # design the frame
+        #-----------------------
+        vbox.AddSpacer(10)
+        vbox.Add(rb)
+        vbox.AddSpacer(10)
+        vbox.Add(hboxok)
+        vbox.AddSpacer(10)
+
+        hbox1=wx.BoxSizer(wx.HORIZONTAL)
+        hbox1.AddSpacer(10)
+        hbox1.Add(vbox)
+        hbox1.AddSpacer(10)
+
+        self.panel.SetSizer(hbox1)
+        hbox1.Fit(self)
+
+    #-----------------------
+    # button methods
+    #-----------------------
+
+    def on_cancelButton(self,event):
+        self.Destroy()
+        self.Parent.Show()
+        self.Parent.Raise()
+
+
+    def on_okButton(self,event):
+        # os.chdir(self.WD)
+        # file_type = self.checked_rb.Label.split()[0] # extracts name of the checked radio button
+        # if file_type == 'generic':
+        #     dia = convert_generic_files_to_MagIC(self, self.WD, "PmagPy generic file conversion")
+        # elif file_type == 'SIO':
+        #     dia = convert_SIO_files_to_MagIC(self, self.WD, "PmagPy SIO file conversion")
+        # elif file_type == 'CIT':
+        #     dia = convert_CIT_files_to_MagIC(self, self.WD, "PmagPy CIT file conversion")
+        # elif file_type == '2g-binary':
+        #     dia = convert_2g_binary_files_to_MagIC(self, self.WD, "PmagPy 2g-binary file conversion")
+        # elif file_type == 'HUJI':
+        #     dia = convert_HUJI_files_to_MagIC(self, self.WD, "PmagPy HUJI file conversion")
+        # elif file_type == 'LDEO':
+        #     dia = convert_LDEO_files_to_MagIC(self, self.WD, "PmagPy LDEO file conversion")
+        # elif file_type == 'IODP':
+        #     dia = convert_IODP_files_to_MagIC(self, self.WD, "PmagPy IODP csv conversion")
+        # elif file_type == 'PMD':
+        #     dia = convert_PMD_files_to_MagIC(self, self.WD, "PmagPy PMD conversion")
+        # elif file_type == 'BGC':
+        #     dia = convert_BGC_files_to_magic(self, self.WD, "PmagPy BGC conversion")
+        # elif file_type == 'TDT':
+        #     tdt_magic.convert(False, self.WD)
+        #     return True
+        # elif file_type == 'JR6':
+        #     dia = convert_JR6_files_to_MagIC(self, self.WD)
+        # elif file_type == 'Utrecht':
+        #     dia = convert_Utrecht_files_to_MagIC(self, self.WD, "PmagPy Utrecht conversion")
+        dia.Center()
+        dia.Show()
+
+
+    def OnRadioButtonSelect(self, event):
+        self.checked_rb = event.GetEventObject()
+
 """
 
 
