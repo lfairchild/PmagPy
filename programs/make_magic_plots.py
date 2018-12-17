@@ -116,8 +116,10 @@ def main():
     do_full_directory = False
     # check that locations propagated down to the lowest table in the contribution
     if 'location' in con.tables[lowest_table].df.columns:
+        if 'locations' not in con.tables:
+            info_log('location names propagated to {}, but could not be validated'.format(lowest_table))
         # are there any locations in the lowest table?
-        if not all(con.tables[lowest_table].df['location'].isnull()):
+        elif not all(con.tables[lowest_table].df['location'].isnull()):
             locs = con.tables['locations'].df.index.unique()
             lowest_locs = con.tables[lowest_table].df['location'].unique()
             incorrect_locs = set(lowest_locs).difference(set(locs))
@@ -126,7 +128,7 @@ def main():
                 info_log('location names propagated to {}'.format(lowest_table))
             else:
                 do_full_directory = True
-                error_log('location names did not propagate fully to {} table'.format(lowest_table), con_id=con_id)
+                error_log('location names did not propagate fully to {} table (looks like there are some naming inconsistencies between tables)'.format(lowest_table), con_id=con_id)
         else:
             do_full_directory = True
             error_log('could not propagate location names down to {} table'.format(lowest_table), con_id=con_id)
@@ -173,7 +175,12 @@ def main():
                 if loc_name == "./":
                     data_df = data_container.df
                 else:
-                    data_df = data_container.df[data_container.df['location'] == loc_name]
+                    # awkward workaround for chars like "(" and "?" that break in regex
+                    try:
+                        data_df = data_container.df[data_container.df['location'].astype(str).str.contains(loc_name, na=False)]
+                    except: #sre_constants.error:
+                        data_df = data_container.df[data_container.df['location'] == loc_name]
+
                 data = data_container.convert_to_pmag_data_list(df=data_df)
                 res = data_container.write_magic_file('tmp_{}.txt'.format(dtype), df=data_df)
                 if not res:
@@ -291,19 +298,9 @@ def main():
                 SiteDIs, inc_key, "", 'F')  # find decs and incs
             dir_data_found = len(SiteDIs)
             print('{} Dec/inc pairs found'.format(dir_data_found))
-            # only individual results - not poles
-            # get only individual results (if result_type col is available)
             if SiteDIs:
-                if 'result_type' in SiteDIs[0]:
-                    ind_SiteDIs = pmag.get_dictitem(SiteDIs, 'result_type', 'i', 'has')
-                    # there are no individual results, the result_type column may be blank
-                    if not any(ind_SiteDIs):
-                        # not average, model, or stacked
-                        ind_SiteDIs = pmag.get_dictitem(SiteDIs, 'result_type', 'a', 'not')
-                        ind_SiteDIs = pmag.get_dictitem(ind_SiteDIs, 'result_type', 'm', 'not')
-                        ind_SiteDIs = pmag.get_dictitem(ind_SiteDIs, 'result_type', 's', 'not')
                 # then convert tilt_corr_key to correct format
-                old_SiteDIs = ind_SiteDIs
+                old_SiteDIs = SiteDIs
                 SiteDIs = []
                 for rec in old_SiteDIs:
                     if tilt_corr_key not in rec:
@@ -368,7 +365,12 @@ def main():
                             if rec != 0:
                                 out.write(str(rec * 1e6) + "\n")
 
-                    histfile = 'LO:_' + loc + \
+                    loc = loc.replace(" ", "_")
+                    if loc == "./":
+                        loc_name = ""
+                    else:
+                        loc_name = loc
+                    histfile = 'LO:_' + loc_name + \
                         '_TY:_intensities_histogram:_.' + fmt
                     # maybe run histplot.main here instead, so you can return an error message
                     CMD = "histplot.py -b 1 -xlab 'Intensity (uT)' -sav -f intensities.txt -F " + histfile
@@ -451,7 +453,7 @@ def main():
         poles = pmag.get_dictitem(
             poles, 'pole_lon', "", 'F')  # are there any poles?
         if len(poles) > 0:  # YES!
-            CMD = 'polemap_magic.py -sav -fmt png'
+            CMD = 'polemap_magic.py -sav -fmt png -rev gv 40'
             print(CMD)
             info_log(CMD, "all locations", "polemap_magic.py")
             os.system(CMD)

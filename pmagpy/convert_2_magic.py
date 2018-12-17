@@ -135,6 +135,8 @@ def _2g_bin(dir_path=".", mag_file="", meas_file='measurements.txt',
         input_dir_path = input_dir
     else:
         input_dir_path = dir_path
+    input_dir_path = os.path.realpath(input_dir_path)
+    dir_path = os.path.realpath(dir_path)
 
     if samp_con:
         Z = 1
@@ -190,13 +192,18 @@ def _2g_bin(dir_path=".", mag_file="", meas_file='measurements.txt',
     d = input.split('\\xcd')
     for line in d:
         rec = line.split('\\x00')
+        # skip nearly empty lines
+        rec_not_null = [i for i in rec if i]
+        if len(rec_not_null) < 5:
+            continue
         if firstline == 1:
             firstline = 0
             spec, vol = "", 1
             el = 51
-            while line[el:el+1] != "\\":
-                spec = spec+line[el]
-                el += 1
+            #while line[el:el+1] != "\\":
+            #    spec = spec+line[el]
+            #    el += 1
+            spec = rec[7]
             # check for bad sample name
             test = spec.split('.')
             date = ""
@@ -6454,7 +6461,6 @@ def livdb(input_dir_path, output_dir_path=".", meas_out="measurements.txt",
                         print("missing data in header.Line %i" %
                               line_number)
                         print(header)
-
                     # read header and sort in a dictionary
                     tmp_header_data = {}
 

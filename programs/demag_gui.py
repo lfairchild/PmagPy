@@ -3785,18 +3785,8 @@ class Demag_GUI(wx.Frame):
 
         if self.data_model == 3.0:
             mdf = self.con.tables['measurements'].df
-            # experiment names are zero indexed too...this was previously
-            # g_index+1
-            index = self.Data[self.s]['magic_experiment_name'] + str(g_index)
-            try:
-                mdf.loc[index, 'quality'] = 'b'
-            except ValueError:
-                mdf_tmp = mdf[mdf['specimen'] == self.s]
-                valid_data = [i for i in mdf_tmp.index if any(
-                    m in self.included_methods and m not in self.excluded_methods for m in mdf_tmp.loc[i]['method_codes'].split(':'))]
-                if len(valid_data) < g_index+1:
-                    print(("no valid measurement data for index %d" % g_index))
-                mdf.loc[valid_data[g_index], 'quality'] = 'b'
+            col_num = mdf.columns.get_loc('quality')
+            mdf.iloc[meas_index, col_num] = 'b'
 
     def mark_fit_good(self, fit, spec=None):
         """
@@ -5684,7 +5674,6 @@ class Demag_GUI(wx.Frame):
                             elif int(PmagSiteRec["dir_n_specimens_lines"]) > 2:
                                 PmagSiteRec["method_codes"] = PmagSiteRec['method_codes']+":DE-FM"
 
-                        PmagSiteRec['result_type'] = 'i'  # decorate it a bit
                         site_height = pmag.get_dictitem(
                             height_info, 'site', site, 'T')
                         if len(site_height) > 0:
@@ -5824,7 +5813,6 @@ class Demag_GUI(wx.Frame):
                             PolRes['citations'] = 'This study'
                             PolRes["result_name"] = "Polarity Average: Polarity "+mode
                             PolRes["pole_comp_name"] = comp+':'+mode
-                            PolRes["result_type"] = "a"
                             PolRes["dir_dec"] = '%7.1f' % (
                                 polpars[mode]['dec'])
                             PolRes["dir_inc"] = '%7.1f' % (

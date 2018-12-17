@@ -742,7 +742,7 @@ def plot_mag(fignum, datablock, s, num, units, norm):
     s : string for title
     num : no idea - set it to zero
     units : [T,K,U] for tesla, kelvin or arbitrary
-    norm : [1,0] if 1, normalize, otherwise don't
+    norm : [True,False] if True, normalize
 
     Effects
     ______
@@ -789,7 +789,7 @@ def plot_mag(fignum, datablock, s, num, units, norm):
                 Tv.append(rec[0])
                 if recnum > 0:
                     Tv.append(rec[0])
-            if norm == 1:
+            if norm:
                 M.append(old_div(rec[3], Ints[-1]))
             else:
                 M.append(rec[3])
@@ -831,7 +831,7 @@ def plot_mag(fignum, datablock, s, num, units, norm):
     Tv.append(Tv[-1])
     plt.plot(T, M)
     plt.plot(T, M, 'ro')
-    if len(Tv) == len(Vdif) and norm == 1:
+    if len(Tv) == len(Vdif) and norm:
         plt.plot(Tv, Vdif, 'g-')
     if units == "T":
         plt.xlabel("Step (mT)")
@@ -1058,7 +1058,7 @@ def plot_arai(fignum, indata, s, units):
     indata : nested list of data for Arai plots:
         the araiblock of data prepared by pmag.sortarai()
     s : specimen name
-    units : units (either K or J for kelvin or Joules)
+    units : [K, J, ""] (kelvin, joules, unknown)
     Effects
     _______
     makes the Arai plot
@@ -1183,7 +1183,7 @@ def plot_np(fignum, indata, s, units):
     fignum : matplotlib figure number
     indata :  araiblock from, e.g., pmag.sortarai()
     s : specimen name
-    units : [K,J] (kelvin or joules)
+    units : [K, J, ""] (kelvin, joules, unknown)
 
     Effect
     _______
@@ -1203,7 +1203,7 @@ def plot_np(fignum, indata, s, units):
                 X.append(rec[0] - 273.)
             else:
                 X.append(rec[0])
-        if units == "J":
+        if (units == "J") or (not units):
             X.append(rec[0])
         Y.append(old_div(rec[3], first_Z[0][3]))
         delta = .02 * Y[0]
@@ -1220,7 +1220,7 @@ def plot_np(fignum, indata, s, units):
                 X.append(rec[0] - 273)
             else:
                 X.append(rec[0])
-        if units == "J":
+        if (units == "J") or (not units):
             X.append(rec[0])
         Y.append(old_div(rec[3], first_Z[0][3]))
     if globals != 0:
@@ -1231,8 +1231,10 @@ def plot_np(fignum, indata, s, units):
     plt.ylabel("Circles: NRM; Squares: pTRM")
     if units == "K":
         plt.xlabel("Temperature (C)")
-    if units == "J":
+    elif units == "J":
         plt.xlabel("Microwave Energy (J)")
+    else:
+        plt.xlabel("")
     title = s + ": NRM = " + '%9.2e' % (first_Z[0][3])
     plt.title(title)
     plt.axhline(y=0, xmin=0, xmax=1, color='k')
@@ -1275,6 +1277,7 @@ def plot_arai_zij(ZED, araiblock, zijdblock, s, units):
     plot_teq(ZED['eqarea'], araiblock, s, "")
     plot_zij(ZED['zijd'], zijdblock, angle, s, norm)
     plot_np(ZED['deremag'], araiblock, s, units)
+    return ZED
 
 
 def plot_b(Figs, araiblock, zijdblock, pars):
@@ -1591,23 +1594,32 @@ def save_plots(Figs, filenames, **kwargs):
         dictionary of filenames, e.g. {'eqarea': 'mc01a_eqarea.svg', ...}
         dict keys should correspond with Figs
     """
+    saved = []
     for key in list(Figs.keys()):
         try:
             plt.figure(num=Figs[key])
             fname = filenames[key]
             if not isServer:  # remove illegal ':' character for windows
                 fname = fname.replace(':', '_')
-            if 'dpi' in list(kwargs.keys()):
-                plt.savefig(fname.replace('/', '-'), dpi=kwargs['dpi'])
+            if 'incl_directory' in kwargs.keys() and not set_env.IS_WIN:
+                if kwargs['incl_directory']:
+                    pass # do not flatten file name
+                else:
+                    fname = fname.replace('/', '-') # flatten file name
             else:
-                plt.savefig(fname.replace('/', '-'))
+                fname = fname.replace('/', '-') # flatten file name
+            if 'dpi' in list(kwargs.keys()):
+                plt.savefig(fname, dpi=kwargs['dpi'])
+            else:
+                plt.savefig(fname)
             if verbose:
-                print(Figs[key], " saved in ", fname.replace('/', '-'))
+                print(Figs[key], " saved in ", fname)
+            saved.append(fname)
         except Exception as ex:
             print(type(ex), ex)
             print('could not save: ', Figs[key], filenames[key])
             print("output file format not supported ")
-    return
+    return saved
 #
 
 
@@ -2850,6 +2862,24 @@ def add_borders(Figs, titles, border_color, text_color, con_id=""):
     """
     Formatting for generating plots on the server
     """
+    def split_title(s):
+        """
+        Add '\n's to split of overly long titles
+        """
+        s_list = s.split(",")
+        lines = []
+        tot = 0
+        line = []
+        for i in s_list:
+            tot += len(i)
+            if tot < 30:
+                line.append(i + ",")
+            else:
+                lines.append(" ".join(line))
+                line = [i]
+                tot = 0
+        lines.append(" ".join(line))
+        return "\n".join(lines).strip(',')
 
     if con_id:
         con_id = "/" + str(con_id)
@@ -2860,7 +2890,8 @@ def add_borders(Figs, titles, border_color, text_color, con_id=""):
     for key in list(Figs.keys()):
 
         fig = plt.figure(Figs[key])
-        plot_title = titles[key]
+        plot_title = split_title(titles[key]).strip().strip('\n')
+
         fig.set_figheight(5.5)
         # get returns Bbox with x0, y0, x1, y1
         pos = fig.gca().get_position()
@@ -3165,7 +3196,8 @@ def plot_map(fignum, lats, lons, Opts):
                      'lat_0': 0, 'lon_0': 0, 'proj': 'moll', 'sym': 'ro', 'symsize': 5,
                      'edge': None, 'pltgrid': 1, 'res': 'c', 'boundinglat': 0.,
                      'padlon': 0, 'padlat': 0, 'gridspace': 30, 'global': 1, 'cmap': 'jet',
-                     'details': {'fancy': 0, 'coasts': 0, 'rivers': 0, 'states': 0, 'countries': 0, 'ocean': 0}}
+                     'details': {'fancy': 0, 'coasts': 0, 'rivers': 0, 'states': 0, 'countries': 0, 'ocean': 0},
+                     'edgecolor': 'face'}
     for key in Opts_defaults.keys():
         if key not in Opts.keys() and key != 'details':
             Opts[key] = Opts_defaults[key]
@@ -3321,9 +3353,9 @@ def plot_map(fignum, lats, lons, Opts):
     if 'symsize' in list(Opts.keys()):
         symsize = Opts['symsize']
     if Opts['sym'][-1] != '-':  # just plot points
-        ax.plot(lons, lats, Opts['sym'],
-                markersize=symsize, transform=ccrs.Geodetic(),
-                markeredgecolor=Opts['edge'])
+        color, symbol = Opts['sym'][0], Opts['sym'][1]
+        ax.scatter(lons, lats, s=Opts['symsize'], c=color, marker=symbol,
+                   transform=ccrs.Geodetic(), edgecolors=Opts['edgecolor'])
         if prn_name == 1:
             print('labels not yet implemented in plot_map')
             # for pt in range(len(lats)):
@@ -3400,7 +3432,7 @@ def plot_mag_map_basemap(fignum, element, lons, lats, element_type, cmap='RdYlBu
     cbar = m.colorbar(cs, location='bottom')
 
 
-def plot_mag_map(fignum, element, lons, lats, element_type, cmap='RdYlBu', lon_0=0, date="", contours=False, proj='PlateCarree'):
+def plot_mag_map(fignum, element, lons, lats, element_type, cmap='coolwarm', lon_0=0, date="", contours=False, proj='PlateCarree'):
     """
     makes a color contour map of geomagnetic field element
 
@@ -3419,16 +3451,15 @@ def plot_mag_map(fignum, element, lons, lats, element_type, cmap='RdYlBu', lon_0
     _________
     contours : plot the contour lines on top of the heat map if True
     proj : cartopy projection ['PlateCarree','Mollweide']
-           NB: The Mollweide projection can only be reliably done for lon_0=0 for element=B and D
-               Also, the Mollweide projection is much slower.
-    cmap : matplotlib color map
+           NB: The Mollweide projection can only be reliably with cartopy=0.17.0; otherwise use lon_0=0.  Also, for declinations, PlateCarree is recommended.
+    cmap : matplotlib color map - see https://matplotlib.org/examples/color/colormaps_reference.html for options
     lon_0 : central longitude of the Mollweide projection
     date : date used for field evaluation,
            if custom ghfile was used, supply filename
 
     Effects
     ______________
-    plots a Robinson projection color contour with  the desired field element
+    plots a color contour map with  the desired field element
     """
 
     if not has_cartopy:
@@ -3472,7 +3503,7 @@ def plot_mag_map(fignum, element, lons, lats, element_type, cmap='RdYlBu', lon_0
             plt.title('Total field strength ($\mu$T): '+date)
     if element_type == 'I':
         plt.contourf(xx, yy, element,
-                     levels=np.arange(levmin, levmax, lincr),
+                     levels=np.arange(-90, 90, lincr),
                      cmap=cmap, transform=ccrs.PlateCarree())
         cbar = plt.colorbar(orientation='horizontal')
         if contours:

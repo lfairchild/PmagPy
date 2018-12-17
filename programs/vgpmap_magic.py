@@ -105,9 +105,6 @@ def main():
 
     site_container = con.tables['sites']
     site_df = site_container.df
-    # use individual results
-    if 'result_type' in site_df.columns:
-        site_df = site_df[site_df['result_type'] == 'i']
     # use records with vgp_lat and vgp_lon
     if 'vgp_lat' in site_df.columns and 'vgp_lon' in site_df.columns:
         cond1, cond2 = site_df['vgp_lat'].notnull(), site_df['vgp_lon'].notnull()
@@ -119,7 +116,11 @@ def main():
     if coord and 'dir_tilt_correction' in Results.columns:
         Results = Results[Results['dir_tilt_correction'] == coord]
     # get location name and average ages
-    location = ":".join(Results['location'].unique())
+    locs = Results['location'].unique()
+    if locs:
+        location = ":".join(Results['location'].unique())
+    else:
+        location = ""
     if 'age' in Results.columns and ages == 1:
         dates = Results['age'].unique()
 
@@ -154,7 +155,7 @@ def main():
             ell1 = float(row['vgp_dm'])
         if 'vgp_dp' in list(row.keys()) and row['vgp_dp']:
             ell2 = float(row['vgp_dp'])
-        if 'vgp_alpha95' in list(row.keys()) and row['vgp_alpha95'].notnull():
+        if 'vgp_alpha95' in list(row.keys()) and (row['vgp_alpha95'] or row['vgp_alpha95'] == 0):
             ell1, ell2 = float(row['vgp_alpha95']), float(row['vgp_alpha95'])
         if ell1 and ell2:
             ppars = []
@@ -162,7 +163,10 @@ def main():
             ppars.append(lats[-1])
             ppars.append(ell1)
             ppars.append(lons[-1])
-            isign = abs(lats[-1]) / lats[-1]
+            try:
+                isign = abs(lats[-1]) / lats[-1]
+            except ZeroDivisionError:
+                isign = 1
             ppars.append(lats[-1] - isign * 90.)
             ppars.append(ell2)
             ppars.append(lons[-1] + 90.)

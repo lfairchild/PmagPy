@@ -188,9 +188,9 @@ def main():
     if not len(intensity_types):
         print('-W- No intensity columns found')
         return
-    # plot first non-empty intensity method found - normalized to initial value anyway -
+    # plot non-empty intensity method found - normalized to initial value anyway -
     # doesn't matter which used
-    int_key = intensity_types[0]
+    int_key = cb.get_intensity_col(meas_data)
     # get all the non-null intensity records of the same type
     meas_data = meas_data[meas_data[int_key].notnull()]
     if 'quality' not in meas_data.columns:
@@ -232,7 +232,7 @@ def main():
     while k < len(specimen_names):
         mpars={"specimen_direction_type": "Error"}
         # set the current specimen for plotting
-        this_specimen = specimen_names[k]
+        this_specimen = str(specimen_names[k])
         # reset beginning/end pca if plotting more than one specimen
         if not specimen:
             beg_pca, end_pca = "", ""
@@ -240,7 +240,7 @@ def main():
             print(this_specimen, k + 1, 'out of ', len(specimen_names))
         if setangle == 0:
             angle = ""
-        this_specimen_measurements = meas_data[meas_data['specimen'].str.contains(
+        this_specimen_measurements = meas_data[meas_data['specimen'].astype(str).str.contains(
             this_specimen).astype(bool)]  # fish out this specimen
         this_specimen_measurements = this_specimen_measurements[-this_specimen_measurements['quality'].str.contains(
             'b').astype(bool)]  # remove bad measurements
@@ -378,7 +378,7 @@ def main():
 #
             prior_specimen_interpretations=[]
             if len(prior_spec_data):
-                prior_specimen_interpretations = prior_spec_data[prior_spec_data['specimen'].str.contains(this_specimen) == True]
+                prior_specimen_interpretations = prior_spec_data[prior_spec_data['specimen'].astype(str).str.contains(this_specimen) == True]
             if (beg_pca == "") and (len(prior_specimen_interpretations) != 0):
                 if len(prior_specimen_interpretations)>0:
                     beg_pcas = pd.to_numeric(
@@ -487,8 +487,11 @@ def main():
                     mpars['specimen_dec'])
                 this_specimen_interpretation["dir_inc"] = '%7.1f' % (
                     mpars['specimen_inc'])
-                this_specimen_interpretation["dir_dang"] = '%7.1f' % (
-                    mpars['specimen_dang'])
+                if "specimen_dang" in mpars:
+                    this_specimen_interpretation["dir_dang"] = '%7.1f' % (
+                        mpars['specimen_dang'])
+                else:
+                    this_specimen_interpretation["dir_dang"] = ''
                 this_specimen_interpretation["dir_n_measurements"] = '%i' % (
                     mpars['specimen_n'])
                 this_specimen_interpretation["dir_tilt_correction"] = coord

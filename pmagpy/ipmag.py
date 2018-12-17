@@ -4351,7 +4351,7 @@ def upload_magic3(concat=1, dir_path='.', dmodel=None, vocab="", contribution=No
     return upload_magic(concat, dir_path, dmodel, vocab, contribution)
 
 
-def upload_magic(concat=1, dir_path='.', dmodel=None, vocab="", contribution=None):
+def upload_magic(concat=False, dir_path='.', dmodel=None, vocab="", contribution=None):
     """
     Finds all magic files in a given directory, and compiles them into an
     upload.txt file which can be uploaded into the MagIC database.
@@ -4520,7 +4520,7 @@ def upload_magic(concat=1, dir_path='.', dmodel=None, vocab="", contribution=Non
         else:
             print(file_type, 'is bad or non-existent - skipping ')
     # add to existing file
-    if concat == 1:
+    if concat:
         f = open(up, 'a')
         f.write('>>>>>>>>>>\n')
         f.close()
@@ -8211,7 +8211,7 @@ def aniso_magic(infile='specimens.txt', samp_file='samples.txt', site_file='site
                 ipar=1, ihext=1, ivec=1, iplot=0, isite=1, iboot=1, vec=0,
                 Dir=[], PDir=[], comp=0, user="",
                 fmt="png", crd="s", verbose=True, plots=0,
-                num_bootstraps=1000, dir_path="."):
+                num_bootstraps=1000, dir_path=".", input_dir_path=""):
 
     def save(ANIS, fmt, title):
         files = {}
@@ -8222,6 +8222,14 @@ def aniso_magic(infile='specimens.txt', samp_file='samples.txt', site_file='site
                 files[key] = title.replace(
                     '__', '_') + "_aniso-" + key + "." + fmt
         pmagplotlib.save_plots(ANIS, files)
+
+    if not input_dir_path:
+        input_dir_path = dir_path
+
+    input_dir_path = os.path.realpath(input_dir_path)
+    dir_path = os.path.realpath(dir_path)
+    print('input dir path', input_dir_path)
+    print('dir path', dir_path)
 
     # initialize some variables
     version_num = pmag.get_version()
@@ -8257,8 +8265,7 @@ def aniso_magic(infile='specimens.txt', samp_file='samples.txt', site_file='site
         pmagplotlib.plot_init(ANIS['data'], 5, 5)
     # read in the data
     fnames = {'specimens': infile, 'samples': samp_file, 'sites': site_file}
-    dir_path = os.path.realpath(dir_path)
-    con = cb.Contribution(dir_path, read_tables=['specimens', 'samples', 'sites'],
+    con = cb.Contribution(input_dir_path, read_tables=['specimens', 'samples', 'sites'],
                           custom_filenames=fnames)
     con.propagate_location_to_specimens()
     if isite:
@@ -8839,6 +8846,7 @@ def aniso_magic_nb(infile='specimens.txt', samp_file='', site_file='', verbose=1
     Parameters
     __________
         verbose : if True, print messages to output
+        dir_path : input directory path
         Data Model 3.0 only formated files:
             infile : specimens formatted file with aniso_s data
             samp_file : samples formatted file with sample => site relationship
@@ -9110,6 +9118,7 @@ def plot_aniso(fignum, aniso_df, Dir=[], PDir=[], ipar=0, ihext=1, ivec=0, iboot
                             comp_X[0][i], color='lightgreen', linewidth=3)
             else:
                 bpars = pmag.sbootpars(Taus, BVs)
+
                 ellpars = [hpars["v1_dec"], hpars["v1_inc"], bpars["v1_zeta"], bpars["v1_zeta_dec"],
                            bpars["v1_zeta_inc"], bpars["v1_eta"], bpars["v1_eta_dec"], bpars["v1_eta_inc"]]
                 pmagplotlib.plot_ell(fignum+1, ellpars, 'r-,', 1, 1)
@@ -10002,21 +10011,42 @@ def zeq_magic(meas_file='measurements.txt', input_dir_path='./', angle=0):
             pmagplotlib.plot_zed(ZED, datablock, angle, s, units)
 
 
-def thellier_magic(meas_file='measurements.txt', input_dir_path='./'):
+def thellier_magic(meas_file="measurements.txt", dir_path=".", input_dir_path="",
+                   spec="", n_specs="all", save_plots=True,  fmt="svg"):
     """
     thellier_magic plots arai and other useful plots for Thellier-type experimental data
+
 
     Parameters
     ----------
     meas_file : str
-        input measurement file
+        input measurement file, default "measurements.txt"
+    dir_path : str
+        output directory, default "."
+        Note: if using Windows, all figures will be saved to working directly
+              *not* dir_path
     input_dir_path : str
-        input directory of meas_file, default "."
+        input file directory IF different from dir_path, default ""
+    spec : str
+        default "", specimen to plot
+    n_specs : int
+        default "all", otherwise number of specimens to plot
+    save_plots : bool, default True
+        if True, non-interactively save plots
+    fmt : str
+        format of saved figures (default is 'svg')
     """
+    # get proper paths
+    if not input_dir_path:
+        input_dir_path = dir_path
+    input_dir_path = os.path.realpath(input_dir_path)
+    dir_path = os.path.realpath(dir_path)
     file_path = pmag.resolve_file_name(meas_file, input_dir_path)
     # read in magic formatted data
     meas_df = pd.read_csv(file_path, sep='\t', header=1)
     int_key = cb.get_intensity_col(meas_df)
+    # list for saved figs
+    saved = []
     # get all the records with measurement data
     meas_data = meas_df[meas_df[int_key].notnull()]
     thel_data = meas_data[meas_data['method_codes'].str.contains(
@@ -10024,23 +10054,410 @@ def thellier_magic(meas_file='measurements.txt', input_dir_path='./'):
     specimens = meas_data.specimen.unique()  # list of specimen names
     if len(specimens) == 0:
         print('there are no data for plotting')
-        return
-    specimens = specimens[0:5]  # just plot the first 5
+        return False, []
+    if spec:
+        if spec not in specimens:
+            print('could not find specimen {}'.format(spec))
+            return False, []
+        specimens = [spec]
+    elif n_specs != "all":
+        try:
+            specimens = specimens[:n_specs]
+        except Exception as ex:
+            pass
     cnt = 1  # set the figure counter to 1
     for this_specimen in specimens:  # step through the specimens  list
+        if pmagplotlib.verbose:
+            print(this_specimen)
         # make the figure dictionary that pmagplotlib likes:
-        AZD = {'arai': cnt, 'zijd': cnt+1, 'eqarea': cnt +
-               2, 'deremag': cnt+3}  # make datablock
-        cnt += 4  # increment the figure counter
+        AZD = {'arai': 1, 'zijd': 2, 'eqarea': 3, 'deremag': 4}  # make datablock
+        #if save_plots:
+        #    AZD = {'arai': 1, 'zijd': 2, 'eqarea': 3, 'deremag': 4}  # make datablock
+        #else:
+        #    AZD = {'arai': cnt, 'zijd': cnt+1, 'eqarea': cnt +
+        #        2, 'deremag': cnt+3}  # make datablock
+        #cnt += 4  # increment the figure counter
         spec_df = thel_data[thel_data.specimen ==
                             this_specimen]  # get data for this specimen
         # get the data block for Arai plot
-        araiblock, field = pmag.sortarai(spec_df, this_specimen, 0, version=3)
+        if len(spec_df)>0:
+            if not save_plots:
+                for key, val in AZD.items():
+                    pmagplotlib.plot_init(val, 5, 5)
+            araiblock, field = pmag.sortarai(spec_df, this_specimen, 0, version=3)
         # get the datablock for Zijderveld plot
-        zijdblock, units = pmag.find_dmag_rec(
-            this_specimen, spec_df, version=3)
-    pmagplotlib.plot_arai_zij(
-        AZD, araiblock, zijdblock, this_specimen, units[-1])  # make the plots
+            zijdblock, units = pmag.find_dmag_rec(
+                this_specimen, spec_df, version=3)
+            if not len(units):
+                unit_string = ""
+            else:
+                unit_string = units[-1]
+            zed = pmagplotlib.plot_arai_zij(
+                AZD, araiblock, zijdblock, this_specimen, unit_string)  # make the plots
+            if not save_plots:
+                pmagplotlib.draw_figs(zed)
+                ans = input(
+                    "S[a]ve plots, [q]uit, <return> to continue\n ")
+                if ans == 'q':
+                    return True, []
+                if ans == 'a':
+                    files = {key : this_specimen + "_" + key + "." + fmt for (key, value) in zed.items()}
+                    if not set_env.IS_WIN:
+                        files = {key: os.path.join(dir_path, value) for (key, value) in files.items()}
+                        incl_directory = True
+                    saved.append(pmagplotlib.save_plots(zed, files, incl_directory=incl_directory))
+
+            if save_plots:
+                files = {key : this_specimen + "_" + key + "." + fmt for (key, value) in zed.items()}
+                incl_directory = False
+                if not pmagplotlib.isServer:
+                    if not set_env.IS_WIN:
+                        files = {key: os.path.join(dir_path, value) for (key, value) in files.items()}
+                        incl_directory = True
+                else:
+                    # fix plot titles, formatting, and file names for server
+                    for key, value in files.copy().items():
+                        files[key] = "SP:_{}_TY:_{}_.{}".format(this_specimen, key, fmt)
+                    black = '#000000'
+                    purple = '#800080'
+                    titles = {}
+                    titles['deremag'] = 'DeReMag Plot'
+                    titles['zijd'] = 'Zijderveld Plot'
+                    titles['arai'] = 'Arai Plot'
+                    titles['TRM'] = 'TRM Acquisition data'
+                    titles['eqarea'] = 'Equal Area Plot'
+                    zed = pmagplotlib.add_borders(
+                        zed, titles, black, purple)
+
+                saved.append(pmagplotlib.save_plots(zed, files, incl_directory=incl_directory))
+        else:
+            print ('no data for ',this_specimen)
+            print ('skipping')
+    return True, saved
+
+
+
+def hysteresis_magic(output_dir_path=".", input_dir_path="", spec_file="specimens.txt", meas_file="measurements.txt",
+                     fmt="svg", save_plots=True, make_plots=True, pltspec=""):
+    """
+    Calculate hysteresis parameters and plot hysteresis data.
+    Plotting may be called interactively with save_plots==False,
+    or be suppressed entirely with make_plots==False.
+
+    Parameters
+    ----------
+    output_dir_path : str, default "."
+        Note: if using Windows, all figures will be saved to working directly
+              *not* dir_path
+    input_dir_path : str
+        path for intput file if different from output_dir_path (default is same)
+    spec_file : str, default "specimens.txt"
+        output file to save hysteresis data
+    meas_file : str, default "measurements.txt"
+        input measurement file
+    fmt : str, default "svg"
+        format for figures, [svg, jpg, pdf, png]
+    save_plots : bool, default True
+        if True, non-interactively save plots
+    make_plots : bool, default True
+        if False, skip making plots and just save hysteresis data
+    pltspec : str, default ""
+        specimen name to plot, otherwise will plot all specimens
+
+    Returns
+    ---------
+    Tuple : (True or False indicating if conversion was sucessful, output file names written)
+    """
+    # put plots in output_dir_path, unless isServer
+    incl_directory = True
+    if pmagplotlib.isServer or set_env.IS_WIN:
+        incl_directory = False
+    # figure out directory/file paths
+    if not input_dir_path:
+        input_dir_path = output_dir_path
+    input_dir_path = os.path.realpath(input_dir_path)
+    output_dir_path = os.path.realpath(output_dir_path)
+    spec_file = pmag.resolve_file_name(spec_file, input_dir_path)
+    meas_file = pmag.resolve_file_name(meas_file, input_dir_path)
+    # format and initialize variables
+    verbose = pmagplotlib.verbose
+    version_num = pmag.get_version()
+    if not make_plots:
+        irm_init, imag_init = -1, -1
+    if save_plots:
+        verbose = False
+    if pltspec:
+        pass
+
+    SpecRecs = []
+    #
+    #
+    meas_data, file_type = pmag.magic_read(meas_file)
+    if file_type != 'measurements':
+        print('bad file', meas_file)
+        return False, []
+    #
+    # initialize some variables
+    # define figure numbers for hyst,deltaM,DdeltaM curves
+    HystRecs, RemRecs = [], []
+    HDD = {}
+    if verbose and make_plots:
+        print("Plots may be on top of each other - use mouse to place ")
+    if make_plots:
+        HDD['hyst'], HDD['deltaM'], HDD['DdeltaM'] = 1, 2, 3
+        if make_plots and (not save_plots):
+            pmagplotlib.plot_init(HDD['DdeltaM'], 5, 5)
+            pmagplotlib.plot_init(HDD['deltaM'], 5, 5)
+            pmagplotlib.plot_init(HDD['hyst'], 5, 5)
+        imag_init = 0
+        irm_init = 0
+    else:
+        HDD['hyst'], HDD['deltaM'], HDD['DdeltaM'], HDD['irm'], HDD['imag'] = 0, 0, 0, 0, 0
+    #
+    if spec_file:
+        prior_data, file_type = pmag.magic_read(spec_file)
+    #
+    # get list of unique experiment names and specimen names
+    #
+    experiment_names, sids = [], []
+    hys_data = pmag.get_dictitem(meas_data, 'method_codes', 'LP-HYS', 'has')
+    dcd_data = pmag.get_dictitem(
+        meas_data, 'method_codes', 'LP-IRM-DCD', 'has')
+    imag_data = pmag.get_dictitem(meas_data, 'method_codes', 'LP-IMAG', 'has')
+    for rec in hys_data:
+        if rec['experiment'] not in experiment_names:
+            experiment_names.append(rec['experiment'])
+        if rec['specimen'] not in sids:
+            sids.append(rec['specimen'])
+    #
+    k = 0
+    if pltspec:
+        k = sids.index(pltspec)
+    while k < len(sids):
+        specimen = sids[k]
+        if pltspec:
+            if specimen != pltspec:
+                k += 1
+                continue
+        # initialize a new specimen hysteresis record
+        HystRec = {'specimen': specimen, 'experiment': ""}
+        if verbose and make_plots:
+            print(specimen, k+1, 'out of ', len(sids))
+    #
+    #
+        # B,M for hysteresis, Bdcd,Mdcd for irm-dcd data
+        B, M, Bdcd, Mdcd = [], [], [], []
+        Bimag, Mimag = [], []  # Bimag,Mimag for initial magnetization curves
+        # fish out all the LP-HYS data for this specimen
+        spec_data = pmag.get_dictitem(hys_data, 'specimen', specimen, 'T')
+        if len(spec_data) > 0:
+            meths = spec_data[0]['method_codes'].split(':')
+            e = spec_data[0]['experiment']
+            HystRec['experiment'] = spec_data[0]['experiment']
+            for rec in spec_data:
+                B.append(float(rec['meas_field_dc']))
+                M.append(float(rec['magn_moment']))
+        # fish out all the data for this specimen
+        spec_data = pmag.get_dictitem(dcd_data, 'specimen', specimen, 'T')
+        if len(spec_data) > 0:
+            HystRec['experiment'] = HystRec['experiment'] + \
+                ':'+spec_data[0]['experiment']
+            irm_exp = spec_data[0]['experiment']
+            for rec in spec_data:
+                Bdcd.append(float(rec['treat_dc_field']))
+                Mdcd.append(float(rec['magn_moment']))
+        # fish out all the data for this specimen
+        spec_data = pmag.get_dictitem(imag_data, 'specimen', specimen, 'T')
+        if len(spec_data) > 0:
+            imag_exp = spec_data[0]['experiment']
+            for rec in spec_data:
+                Bimag.append(float(rec['meas_field_dc']))
+                Mimag.append(float(rec['magn_moment']))
+    #
+    # now plot the hysteresis curve
+    #
+        if len(B) > 0:
+            hmeths = []
+            for meth in meths:
+                hmeths.append(meth)
+
+            hpars = pmagplotlib.plot_hdd(HDD, B, M, e)
+            if make_plots:
+                if not set_env.IS_WIN:
+                    pmagplotlib.draw_figs(HDD)
+    #
+            if make_plots:
+                pmagplotlib.plot_hpars(HDD, hpars, 'bs')
+            HystRec['hyst_mr_moment'] = hpars['hysteresis_mr_moment']
+            HystRec['hyst_ms_moment'] = hpars['hysteresis_ms_moment']
+            HystRec['hyst_bc'] = hpars['hysteresis_bc']
+            HystRec['hyst_bcr'] = hpars['hysteresis_bcr']
+            HystRec['hyst_xhf'] = hpars['hysteresis_xhf']
+            HystRec['experiments'] = e
+            HystRec['software_packages'] = version_num
+            if hpars["magic_method_codes"] not in hmeths:
+                hmeths.append(hpars["magic_method_codes"])
+            methods = ""
+            for meth in hmeths:
+                methods = methods+meth.strip()+":"
+            HystRec["method_codes"] = methods[:-1]
+            HystRec["citations"] = "This study"
+    #
+        if len(Bdcd) > 0:
+            rmeths = []
+            for meth in meths:
+                rmeths.append(meth)
+            if verbose and make_plots:
+                print('plotting IRM')
+            if irm_init == 0:
+                HDD['irm'] = 5 if 'imag' in HDD else 4
+                if make_plots and (not save_plots):
+                    pmagplotlib.plot_init(HDD['irm'], 5, 5)
+                irm_init = 1
+            rpars = pmagplotlib.plot_irm(HDD['irm'], Bdcd, Mdcd, irm_exp)
+            HystRec['rem_mr_moment'] = rpars['remanence_mr_moment']
+            HystRec['rem_bcr'] = rpars['remanence_bcr']
+            HystRec['experiments'] = specimen+':'+irm_exp
+            if rpars["magic_method_codes"] not in meths:
+                meths.append(rpars["magic_method_codes"])
+            methods = ""
+            for meth in rmeths:
+                methods = methods+meth.strip()+":"
+            HystRec["method_codes"] = HystRec['method_codes']+':'+methods[:-1]
+            HystRec["citations"] = "This study"
+        else:
+            if irm_init:
+                pmagplotlib.clearFIG(HDD['irm'])
+        if len(Bimag) > 0:
+            if verbose and make_plots:
+                print('plotting initial magnetization curve')
+# first normalize by Ms
+            Mnorm = []
+            for m in Mimag:
+                Mnorm.append(m / float(hpars['hysteresis_ms_moment']))
+            if imag_init == 0:
+                HDD['imag'] = 4
+                if make_plots and (not save_plots):
+                    pmagplotlib.plot_init(HDD['imag'], 5, 5)
+                imag_init = 1
+            pmagplotlib.plot_imag(HDD['imag'], Bimag, Mnorm, imag_exp)
+        else:
+            if imag_init:
+                pmagplotlib.clearFIG(HDD['imag'])
+        if len(list(HystRec.keys())) > 0:
+            HystRecs.append(HystRec)
+    #
+        files = {}
+        if save_plots and make_plots:
+            if pltspec:
+                s = pltspec
+            else:
+                s = specimen
+            files = {}
+            for key in list(HDD.keys()):
+                if incl_directory:
+                    files[key] = os.path.join(output_dir_path, s+'_'+key+'.'+fmt)
+                else:
+                    files[key] = s+'_'+key+'.'+fmt
+            if make_plots and save_plots:
+                pmagplotlib.save_plots(HDD, files, incl_directory=incl_directory)
+            #if pltspec:
+            #    return True, []
+        if make_plots and (not save_plots):
+            pmagplotlib.draw_figs(HDD)
+            ans = input(
+                "S[a]ve plots, [s]pecimen name, [q]uit, <return> to continue\n ")
+            if ans == "a":
+                files = {}
+                for key in list(HDD.keys()):
+                    if incl_directory:
+                        files[key] = os.path.join(output_dir_path, specimen+'_'+key+'.'+fmt)
+                    else:
+                        files[key] = specimen+'_'+key+'.'+fmt
+                pmagplotlib.save_plots(HDD, files, incl_directory=incl_directory)
+            if ans == '':
+                k += 1
+            if ans == "p":
+                del HystRecs[-1]
+                k -= 1
+            if ans == 'q':
+                print("Good bye")
+                return True, []
+            if ans == 's':
+                keepon = 1
+                specimen = input(
+                    'Enter desired specimen name (or first part there of): ')
+                while keepon == 1:
+                    try:
+                        k = sids.index(specimen)
+                        keepon = 0
+                    except:
+                        tmplist = []
+                        for qq in range(len(sids)):
+                            if specimen in sids[qq]:
+                                tmplist.append(sids[qq])
+                        print(specimen, " not found, but this was: ")
+                        print(tmplist)
+                        specimen = input('Select one or try again\n ')
+                        k = sids.index(specimen)
+        else:
+            k += 1
+        if len(B) == 0 and len(Bdcd) == 0:
+            if verbose:
+                print('skipping this one - no hysteresis data')
+            k += 1
+        if k < len(sids):
+            # must re-init figs for Windows to keep size
+            if make_plots and set_env.IS_WIN:
+                if not save_plots:
+                    pmagplotlib.plot_init(HDD['DdeltaM'], 5, 5)
+                    pmagplotlib.plot_init(HDD['deltaM'], 5, 5)
+                    pmagplotlib.plot_init(HDD['hyst'], 5, 5)
+                if len(Bimag) > 0:
+                    HDD['imag'] = 4
+                    if not save_plots:
+                        pmagplotlib.plot_init(HDD['imag'], 5, 5)
+                if len(Bdcd) > 0:
+                    HDD['irm'] = 5 if 'imag' in HDD else 4
+                    if not save_plots:
+                        pmagplotlib.plot_init(HDD['irm'], 5, 5)
+            elif not make_plots and set_env.IS_WIN:
+                HDD['hyst'], HDD['deltaM'], HDD['DdeltaM'], HDD['irm'], HDD['imag'] = 0, 0, 0, 0, 0
+    if len(HystRecs) > 0:
+        #  go through prior_data, clean out prior results and save combined file as spec_file
+        SpecRecs, keys = [], list(HystRecs[0].keys())
+        if len(prior_data) > 0:
+            prior_keys = list(prior_data[0].keys())
+        else:
+            prior_keys = []
+        for rec in prior_data:
+            for key in keys:
+                if key not in list(rec.keys()):
+                    rec[key] = ""
+            if 'LP-HYS' not in rec['method_codes']:
+                SpecRecs.append(rec)
+        for rec in HystRecs:
+            for key in prior_keys:
+                if key not in list(rec.keys()):
+                    rec[key] = ""
+            prior = pmag.get_dictitem(
+                prior_data, 'specimen', rec['specimen'], 'T')
+            if len(prior) > 0 and 'sample' in list(prior[0].keys()):
+                # pull sample name from prior specimens table
+                rec['sample'] = prior[0]['sample']
+            SpecRecs.append(rec)
+        # drop unnecessary/duplicate rows
+        #dir_path = os.path.split(spec_file)[0]
+        con = cb.Contribution(input_dir_path, read_tables=[])
+        con.add_magic_table_from_data('specimens', SpecRecs)
+        con.tables['specimens'].drop_duplicate_rows(
+            ignore_cols=['specimen', 'sample', 'citations', 'software_packages'])
+        con.tables['specimens'].df = con.tables['specimens'].df.drop_duplicates()
+        spec_file = os.path.join(output_dir_path, os.path.split(spec_file)[1])
+        con.write_table_to_file('specimens', custom_name=spec_file)
+        if verbose:
+            print("hysteresis parameters saved in ", spec_file)
+        return True, [spec_file]
 
 
 def sites_extract(site_file='sites.txt', directions_file='directions.xls',
@@ -10085,43 +10502,9 @@ def sites_extract(site_file='sites.txt', directions_file='directions.xls',
         print("bad site file name")
         return False, "bad site file name"
     sites_df = pd.read_csv(fname, sep='\t', header=1)
-# do directional stuff first
-    # a few things need cleaning up
-    dir_df = sites_df.copy().dropna(
-        subset=['dir_dec', 'dir_inc'])  # delete blank directions
-    # sort by absolute value of vgp_lat in order to eliminate duplicate rows for
-    # directions put in by accident on intensity rows
-    if len(dir_df) > 0:
-
-        DirCols = ["Site", "TC (%)", "Dec.", "Inc.", "N", "k    ", "R", "a95"]
-
-        dir_file = pmag.resolve_file_name(directions_file, output_dir_path)
-        dir_df['dir_n_samples'] = dir_df['dir_n_samples'].values.astype('int')
-        dir_df['dir_tilt_correction'] = dir_df['dir_tilt_correction'].values.astype(
-            'int')
-        has_vgps = False
-        if 'vgp_lat' in dir_df.columns:
-            test_vgp = dir_df.dropna(subset=['vgp_lat', 'vgp_lon'])
-            if len(test_vgp) > 0:
-                has_vgps = True
-        if has_vgps:
-            dir_df['vgp_lat_abs'] = dir_df.vgp_lat.abs()
-            dir_df.sort_values(by=['site', 'vgp_lat_abs'],
-                               ascending=False, inplace=True)
-            dir_df = dir_df[['site', 'dir_tilt_correction', 'dir_dec', 'dir_inc',
-                             'dir_n_samples', 'dir_k', 'dir_r', 'dir_alpha95', 'vgp_lat', 'vgp_lon']]
-    # this will take the first record for each site's directions (including VGP lat if present)
-            DirCols.append("VGP Lat")
-            DirCols.append("VGP Long")
-            dir_df.drop_duplicates(
-                subset=['dir_dec', 'dir_inc', 'site'], inplace=True)
-        else:
-            dir_df.drop_duplicates(
-                subset=['dir_dec', 'dir_inc', 'site'], inplace=True)
-            dir_df = dir_df[['site', 'dir_tilt_correction', 'dir_dec', 'dir_inc',
-                             'dir_n_samples', 'dir_k', 'dir_r', 'dir_alpha95']]
-        dir_df.columns = DirCols
-        dir_df.sort_values(by=['Site'], inplace=True, ascending=True)
+    dir_df = map_magic.convert_site_dm3_table_directions(sites_df)
+    dir_file = pmag.resolve_file_name(directions_file, output_dir_path)
+    if len(dir_df):
         if latex:
             if dir_file.endswith('.xls'):
                 dir_file = dir_file[:-4] + ".tex"
@@ -10139,77 +10522,9 @@ def sites_extract(site_file='sites.txt', directions_file='directions.xls',
     else:
         print("No directional data for ouput.")
         dir_file = None
-# now for the intensities
-    has_vadms, has_vdms = False, False
-    if 'int_abs' not in sites_df:
-        sites_df['int_abs'] = None
-    if 'int_n_samples' not in sites_df:
-        sites_df['int_n_samples'] = None
-    int_df = sites_df.copy().dropna(subset=['int_abs'])
-    int_df['int_n_samples'] = int_df['int_n_samples'].values.astype('int')
-    if len(int_df) > 0:
-        int_df['int_abs_uT'] = 1e6*int_df.int_abs.values  # convert to uT
-        int_df['int_abs_sigma_uT'] = 1e6 * \
-            int_df.int_abs_sigma.values  # convert to uT
-        int_df['int_abs_uT'] = int_df['int_abs_uT'].values.astype('int')
-        int_df['int_abs_sigma_uT'] = int_df['int_abs_sigma_uT'].values.astype(
-            'int')
-        int_df['int_abs_sigma_perc'] = int_df['int_abs_sigma_perc'].values.astype(
-            'int')
-        intensity_file = pmag.resolve_file_name(
-            intensity_file, output_dir_path)
-
-        IntCols = ["Site", "N", "B", "B sigma", "sigma (%)"]
-        if 'vadm' in int_df.columns:
-            test_vadm = int_df.dropna(subset=['vadm'])
-            if len(test_vadm) > 0:
-                has_vadms = True
-
-        if 'vdm' in int_df.columns:
-            test_vdm = int_df.dropna(subset=['vdm'])
-            if len(test_vdm) > 0:
-                has_vdms = True
-
-        if has_vadms:
-            IntCols.append("VADM")
-            IntCols.append("VADM sigma")
-        if has_vdms:
-            IntCols.append("VDM")
-            IntCols.append("VDM sigma")
-        if not has_vadms and not has_vdms:
-            int_df = int_df[['site', 'int_n_samples', 'int_abs_uT', 'int_abs_sigma_uT',
-                             'int_abs_sigma_perc']]
-        if has_vadms and not has_vdms:
-            int_df.sort_values(by=['site', 'vadm'],
-                               ascending=False, inplace=True)
-            int_df.drop_duplicates(subset=['int_abs_uT', 'site'], inplace=True)
-
-            int_df['vadm_ZAm2'] = 1e-21*int_df.vadm.values
-            int_df['vadm_sigma_ZAm2'] = 1e-21*int_df.vadm_sigma.values
-            int_df = int_df[['site', 'int_n_samples', 'int_abs_uT', 'int_abs_sigma_uT',
-                             'int_abs_sigma_perc', 'vadm_ZAm2', 'vadm_ZAm2_sigma']]
-        if not has_vadms and has_vdms:
-            int_df.sort_values(by=['site', 'vdm'],
-                               ascending=False, inplace=True)
-            int_df.drop_duplicates(subset=['int_abs_uT', 'site'], inplace=True)
-            int_df['vdm_ZAm2'] = 1e-21*int_df.vdm.values()
-            int_df['vdm_sigma_ZAm2'] = 1e-21*int_df.vdm_sigma.values()
-
-            int_df = int_df[['site', 'int_n_samples', 'int_abs_uT', 'int_abs_sigma_uT',
-                             'int_abs_sigma_perc', 'vdm_ZAm2', 'vdm_ZAm2_sigma']]
-        if has_vadms and has_vdms:
-            int_df.sort_values(by=['site', 'vadm'],
-                               ascending=False, inplace=True)
-            int_df.drop_duplicates(subset=['int_abs_uT', 'site'], inplace=True)
-            int_df['vadm_ZAm2'] = 1e-21*int_df.vadm.values
-            int_df['vadm_sigma_ZAm2'] = 1e-21*int_df.vadm_sigma.values
-            int_df['vdm_ZAm2'] = 1e-21*int_df.vdm.values
-            int_df['vdm_sigma_ZAm2'] = 1e-21*int_df.vdm_sigma.values
-            int_df = int_df[['site', 'int_n_samples', 'int_abs_uT', 'int_abs_sigma_uT',
-                             'int_abs_sigma_perc', 'vadm_ZAm2', 'vadm_sigma_ZAm2', 'vdm_ZAm2', 'vdm_sigma_ZAm2']]
-        int_df.columns = IntCols
-        int_df.sort_values(by=['Site'], inplace=True, ascending=True)
-        int_df.fillna(value='', inplace=True)
+    intensity_file = pmag.resolve_file_name(intensity_file, output_dir_path)
+    int_df = map_magic.convert_site_dm3_table_intensity(sites_df)
+    if len(int_df):
         if latex:
             if intensity_file.endswith('.xls'):
                 intensity_file = intensity_file[:-4] + ".tex"
@@ -10267,3 +10582,137 @@ def sites_extract(site_file='sites.txt', directions_file='directions.xls',
         print("No location information  for ouput.")
         info_file = None
     return True, [fname for fname in [info_file, intensity_file, dir_file] if fname]
+
+
+def specimens_extract(spec_file='specimens.txt', output_file='specimens.xls', landscape=False,
+                      longtable=False, output_dir_path='./', input_dir_path='', latex=False):
+    """
+    Extracts specimen results  from a MagIC 3.0 format specimens.txt file.
+    Default output format is an Excel file.
+    typeset with latex on your own computer.
+
+    Parameters
+    ___________
+    spec_file : str
+         input file name
+    input_dir_path : str
+          path for intput file if different from output_dir_path (default is same)
+    latex : boolean
+           if True, output file should be latex formatted table with a .tex ending
+    longtable : boolean
+           if True output latex longtable
+    landscape : boolean
+           if True output latex landscape table
+    Return :
+        [True,False],  data table error type : True if successful
+
+    Effects :
+        writes xls or latex formatted tables for use in publications
+    """
+    if not input_dir_path:
+        input_dir_path = output_dir_path
+    try:
+        fname = pmag.resolve_file_name(spec_file, input_dir_path)
+    except IOError:
+        print("bad specimen file name")
+        return False, "bad specimen file name"
+    spec_df = pd.read_csv(fname, sep='\t', header=1)
+    spec_df.dropna('columns', how='all', inplace=True)
+    if 'int_abs' in spec_df.columns:
+        spec_df.dropna(subset=['int_abs'], inplace=True)
+    if len(spec_df) > 0:
+        table_df = map_magic.convert_specimen_dm3_table(spec_df)
+        out_file = pmag.resolve_file_name(output_file, output_dir_path)
+        if latex:
+            if out_file.endswith('.xls'):
+                out_file = out_file.rsplit('.')[0] + ".tex"
+            info_out = open(out_file, 'w+', errors="backslashreplace")
+            info_out.write('\documentclass{article}\n')
+            info_out.write('\\usepackage{booktabs}\n')
+            if landscape:
+                info_out.write('\\usepackage{lscape}')
+            if longtable:
+                info_out.write('\\usepackage{longtable}\n')
+            info_out.write('\\begin{document}\n')
+            if landscape:
+                info_out.write('\\begin{landscape}\n')
+            info_out.write(table_df.to_latex(index=False, longtable=longtable,
+                                             escape=True, multicolumn=False))
+            if landscape:
+                info_out.write('\end{landscape}\n')
+            info_out.write('\end{document}\n')
+            info_out.close()
+        else:
+            table_df.to_excel(out_file, index=False)
+
+    else:
+        print("No specimen data   for ouput.")
+    return True, [out_file]
+
+
+def criteria_extract(crit_file='criteria.txt', output_file='criteria.xls',
+                     output_dir_path='./', input_dir_path='', latex=False):
+    """
+    Extracts criteria  from a MagIC 3.0 format criteria.txt file.
+    Default output format is an Excel file.
+    typeset with latex on your own computer.
+
+    Parameters
+    ___________
+    crit_file : str
+         input file name
+    input_dir_path : str
+          path for intput file if different from output_dir_path (default is same)
+    latex : boolean
+           if True, output file should be latex formatted table with a .tex ending
+
+    Return :
+        [True,False],  data table error type : True if successful
+
+    Effects :
+        writes xls or latex formatted tables for use in publications
+    """
+    if not input_dir_path:
+        input_dir_path = output_dir_path
+    try:
+        fname = pmag.resolve_file_name(crit_file, input_dir_path)
+    except IOError:
+        print("bad criteria file name")
+        return False, "bad site file name"
+    crit_df = pd.read_csv(fname, sep='\t', header=1)
+    if len(crit_df) > 0:
+        out_file = pmag.resolve_file_name(output_file, output_dir_path)
+
+        s = crit_df['table_column'].str.split(pat='.', expand=True)
+        crit_df['table'] = s[0]
+        crit_df['column'] = s[1]
+        crit_df = crit_df[['table', 'column',
+                           'criterion_value', 'criterion_operation']]
+
+        crit_df.columns = ['Table', 'Statistic', 'Threshold', 'Operation']
+
+        if latex:
+            if out_file.endswith('.xls'):
+                out_file = out_file.rsplit('.')[0] + ".tex"
+            crit_df.loc[crit_df['Operation'].str.contains(
+                '<'), 'operation'] = 'maximum'
+            crit_df.loc[crit_df['Operation'].str.contains(
+                '>'), 'operation'] = 'minimum'
+            crit_df.loc[crit_df['Operation'] == '=', 'operation'] = 'equal to'
+            info_out = open(out_file, 'w+', errors="backslashreplace")
+            info_out.write('\documentclass{article}\n')
+            info_out.write('\\usepackage{booktabs}\n')
+            # info_out.write('\\usepackage{longtable}\n')
+            # T1 will ensure that symbols like '<' are formatted correctly
+            info_out.write("\\usepackage[T1]{fontenc}\n")
+            info_out.write('\\begin{document}')
+            info_out.write(crit_df.to_latex(index=False, longtable=False,
+                                            escape=True, multicolumn=False))
+            info_out.write('\end{document}\n')
+            info_out.close()
+        else:
+            crit_df.to_excel(out_file, index=False)
+
+    else:
+        print("No criteria   for ouput.")
+    return True, [out_file]

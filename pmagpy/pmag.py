@@ -3162,7 +3162,7 @@ def PintPars(datablock, araiblock, zijdblock, start, end, accept, **kwargs):
     pars["fail_arai_beta_box_scatter"] = False
     pars["fail_ptrm_beta_box_scatter"] = False  # fail scat due to pTRM checks
     pars["fail_tail_beta_box_scatter"] = False  # fail scat due to tail checks
-    pars[scat_key] = "1"  # Pass by default
+    pars[scat_key] = "t"  # Pass by default
 
     # --------------------------------------------------------------
     # collect all Arai plot data points in arrays
@@ -3400,9 +3400,9 @@ def PintPars(datablock, araiblock, zijdblock, start, end, accept, **kwargs):
         # check if specimen_scat is PASS or FAIL:
 
         if pars["fail_tail_beta_box_scatter"] or pars["fail_ptrm_beta_box_scatter"] or pars["fail_arai_beta_box_scatter"]:
-            pars[scat_key] = '0'
+            pars[scat_key] = 'f'
         else:
-            pars[scat_key] = '1'
+            pars[scat_key] = 't'
 
     return pars, 0
 
@@ -6844,6 +6844,7 @@ def sbootpars(Taus, Vs):
     bpars["t2_sigma"] = sig
     x, sig = gausspars(Tau3s)
     bpars["t3_sigma"] = sig
+    V1s=flip(V1s,combine=True)
     kpars = dokent(V1s, len(V1s))
     bpars["v1_dec"] = kpars["dec"]
     bpars["v1_inc"] = kpars["inc"]
@@ -6853,6 +6854,7 @@ def sbootpars(Taus, Vs):
     bpars["v1_zeta_inc"] = kpars["Zinc"]
     bpars["v1_eta_dec"] = kpars["Edec"]
     bpars["v1_eta_inc"] = kpars["Einc"]
+    V2s=flip(V2s,combine=True)
     kpars = dokent(V2s, len(V2s))
     bpars["v2_dec"] = kpars["dec"]
     bpars["v2_inc"] = kpars["inc"]
@@ -6862,6 +6864,7 @@ def sbootpars(Taus, Vs):
     bpars["v2_zeta_inc"] = kpars["Zinc"]
     bpars["v2_eta_dec"] = kpars["Edec"]
     bpars["v2_eta_inc"] = kpars["Einc"]
+    V3s=flip(V3s,combine=True)
     kpars = dokent(V3s, len(V3s))
     bpars["v3_dec"] = kpars["dec"]
     bpars["v3_inc"] = kpars["inc"]
@@ -10544,7 +10547,7 @@ def adjust_val_to_360(val):
     Return argument adjusted to be between
     0 and 360 degrees.
     """
-    if not val:
+    if not val and (val != 0):
         return None
     else:
         try:
@@ -11077,7 +11080,7 @@ def age_to_BP(age, age_unit):
     if age_unit == "Years AD (+/-)" or age_unit == "Years Cal AD (+/-)":
         if age < 0:
             age = age+1  # to correct for there being no 0 AD
-        ageBP = age-1950
+        ageBP = 1950-age
     elif age_unit == "Years BP" or age_unit == "Years Cal BP":
         ageBP = age
     elif age_unit == "ka":
@@ -11311,6 +11314,7 @@ def vocab_convert(vocab, standard, key=''):
             standard_value = method_codes_to_geomagia[vocab]
     if standard_value == "":
         print("Magic vocab ", vocab, " not found for standard ", standard)
+        return(vocab)
     return standard_value
 
 

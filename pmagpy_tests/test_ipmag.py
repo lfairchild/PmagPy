@@ -10,6 +10,7 @@ from pmagpy import pmag
 from pmagpy import ipmag
 from pmagpy import contribution_builder as cb
 from pmagpy import convert_2_magic as convert
+from pmag_env import set_env
 #from pmagpy import find_pmag_dir
 WD = pmag.get_test_WD()
 
@@ -171,7 +172,7 @@ class TestDownloadMagic(unittest.TestCase):
         files = ['locations.txt', 'sites.txt', 'samples.txt', 'specimens.txt',
                  'measurements.txt', 'contribution.txt']
         pmag.remove_files(files, self.download_dir)
-        ipmag.download_magic('magic_contribution_16503.txt',
+        ipmag.download_magic('magic_contribution_16533.txt',
                              dir_path=self.download_dir,
                              input_dir_path=self.download_dir)
         output_files = os.listdir(self.download_dir)
@@ -456,8 +457,8 @@ class TestAarmMagic(unittest.TestCase):
 
     def tearDown(self):
         filelist = ['magic_measurements.txt', 'my_magic_measurements.txt',
-                    'custom_specimens.txt', 'er_samples.txt', 'my_er_samples.txt',
-                    'er_sites.txt', 'rmag_anisotropy.txt', 'aarm_measurements.txt']
+                    'er_samples.txt', 'my_er_samples.txt',
+                    'er_sites.txt', 'rmag_anisotropy.txt']
         pmag.remove_files(filelist, self.aarm_WD)
         os.chdir(WD)
 
@@ -489,6 +490,60 @@ class TestAtrmMagic(unittest.TestCase):
         # check that samples are there from input specimen file
         df = cb.MagicDataFrame(outfile)
         self.assertTrue(any(df.df['sample']))
+
+
+class TestHysteresisMagic(unittest.TestCase):
+    def setUp(self):
+        self.hyst_WD = os.path.join(WD, 'data_files', 'hysteresis_magic')
+
+    def tearDown(self):
+        filelist = ['magic_measurements.txt', 'my_magic_measurements.txt',
+                    'custom_specimens.txt', 'er_samples.txt', 'my_er_samples.txt',
+                    'er_sites.txt', 'rmag_anisotropy.txt']
+        pmag.remove_files(filelist, self.hyst_WD)
+        glob_strings = ['*.svg', '*.png', "{}/*.svg".format(self.hyst_WD),
+                        "{}/*.png".format(self.hyst_WD)]
+        for string in glob_strings:
+            files = glob.glob(string)
+            for fname in files:
+                os.remove(fname)
+        os.chdir(WD)
+
+    def test_hysteresis_no_figs(self):
+        res, outfiles = ipmag.hysteresis_magic(input_dir_path=self.hyst_WD,
+                                               spec_file='custom_specimens.txt', make_plots=False)
+        self.assertTrue(res)
+        self.assertEqual(outfiles[0], os.path.realpath(os.path.join(".", "custom_specimens.txt")))
+        fnames = glob.glob("*.svg")
+        self.assertFalse(fnames)
+
+    def test_hysteresis_with_figs(self):
+        res, outfiles = ipmag.hysteresis_magic(input_dir_path=self.hyst_WD,
+                                               spec_file='custom_specimens.txt', make_plots=True)
+        self.assertTrue(res)
+        self.assertEqual(outfiles[0], os.path.realpath(os.path.join(".", "custom_specimens.txt")))
+        fnames = glob.glob("*.svg")
+        self.assertEqual(len(fnames), 32)
+
+    def test_hysteresis_bad_file(self):
+        res, outfiles = ipmag.hysteresis_magic(self.hyst_WD, meas_file="fake.txt",
+                                               spec_file='custom_specimens.txt',
+                                               save_plots=True)
+        self.assertFalse(res)
+
+    def test_hysteresis_success(self):
+        res, outfiles = ipmag.hysteresis_magic(output_dir_path=self.hyst_WD, spec_file='custom_specimens.txt',
+                                               save_plots=True, fmt="png")
+        self.assertTrue(res)
+        for f in outfiles:
+            print('f', f)
+            self.assertTrue(os.path.exists(f))
+        if set_env.IS_WIN:
+            fstring = "*.png"
+        else:
+            fstring = '{}/*.png'.format(self.hyst_WD)
+        files = glob.glob(fstring)
+        self.assertEqual(len(files), 32)
 
 
 class TestSitesExtract(unittest.TestCase):
@@ -525,6 +580,127 @@ class TestSitesExtract(unittest.TestCase):
         for fname in outfiles:
             self.assertTrue(os.path.exists(fname))
             self.assertTrue(fname.endswith('.tex'))
+
+
+class TestSpecimensExtract(unittest.TestCase):
+    def setUp(self):
+        self.WD_0 = os.path.join(WD, 'data_files', '3_0', 'McMurdo')
+        self.WD_1 = os.path.join(WD, 'data_files', '3_0', 'Megiddo')
+
+    def tearDown(self):
+        filelist = ['magic_measurements.txt', 'my_magic_measurements.txt',
+            'custom_specimens.txt', 'er_samples.txt', 'my_er_samples.txt',
+            'er_sites.txt', 'rmag_anisotropy.txt']
+
+        patterns = [os.path.join(self.WD_0, "*.tex"), os.path.join(self.WD_0, "*.xls"),
+                    os.path.join(self.WD_1, "*.tex"), os.path.join(self.WD_1, "*.xls"),
+                    os.path.join(self.WD_0, "*.aux"), os.path.join(self.WD_0, "*.dvi"),
+                    os.path.join(self.WD_1, "*.aux"), os.path.join(self.WD_1, "*.dvi"),
+                    os.path.join(self.WD_0, "*.gz"), os.path.join(self.WD_1, "*.gz")]
+
+        for pattern in patterns:
+            for fname in glob.glob(pattern):
+                os.remove(fname)
+
+
+    def test_McMurdo(self):
+        res, outfiles = ipmag.specimens_extract(spec_file='specimens.txt', output_dir_path=self.WD_0, latex=False)
+        self.assertTrue(res)
+        for f in outfiles:
+            self.assertTrue(os.path.exists(f))
+
+    def test_Megiddo(self):
+        res, outfiles = ipmag.specimens_extract(spec_file='specimens.txt', output_dir_path=self.WD_1, latex=True)
+        self.assertTrue(res)
+        self.assertEqual(len(outfiles), 1)
+        for fname in outfiles:
+            self.assertTrue(os.path.exists(fname))
+            self.assertTrue(fname.endswith('.tex'))
+
+
+
+class TestCriteriaExtract(unittest.TestCase):
+    def setUp(self):
+        self.WD_0 = os.path.join(WD, 'data_files', '3_0', 'McMurdo')
+        self.WD_1 = os.path.join(WD, 'data_files', '3_0', 'Megiddo')
+
+    def tearDown(self):
+        filelist = ['magic_measurements.txt', 'my_magic_measurements.txt',
+            'custom_specimens.txt', 'er_samples.txt', 'my_er_samples.txt',
+            'er_sites.txt', 'rmag_anisotropy.txt']
+
+        patterns = [os.path.join(self.WD_0, "*.tex"), os.path.join(self.WD_0, "*.xls"),
+                    os.path.join(self.WD_1, "*.tex"), os.path.join(self.WD_1, "*.xls"),
+                    os.path.join(self.WD_0, "*.aux"), os.path.join(self.WD_0, "*.dvi"),
+                    os.path.join(self.WD_1, "*.aux"), os.path.join(self.WD_1, "*.dvi"),
+                    os.path.join(self.WD_0, "*.gz"), os.path.join(self.WD_1, "*.gz")]
+
+        for pattern in patterns:
+            for fname in glob.glob(pattern):
+                os.remove(fname)
+
+
+    def test_McMurdo(self):
+        res, outfiles = ipmag.criteria_extract('criteria.txt', output_dir_path=self.WD_0, latex=False)
+        self.assertTrue(res)
+        for f in outfiles:
+            self.assertTrue(os.path.exists(f))
+
+    def test_Megiddo(self):
+        res, outfiles = ipmag.criteria_extract('criteria.txt', output_dir_path=self.WD_1, latex=True)
+        self.assertTrue(res)
+        self.assertEqual(len(outfiles), 1)
+        for fname in outfiles:
+            self.assertTrue(os.path.exists(fname))
+            self.assertTrue(fname.endswith('.tex'))
+
+
+class TestThellierMagic(unittest.TestCase):
+    def setUp(self):
+        self.thel_WD = os.path.join(WD, 'data_files', 'thellier_magic')
+
+    def tearDown(self):
+        filelist = ['magic_measurements.txt', 'my_magic_measurements.txt',
+                    'custom_specimens.txt', 'er_samples.txt', 'my_er_samples.txt',
+                    'er_sites.txt', 'rmag_anisotropy.txt']
+        pmag.remove_files(filelist, self.thel_WD)
+        glob_strings = ['*.svg', '*.png', os.path.join(self.thel_WD, "*.svg"),
+                        os.path.join(self.thel_WD, "*.png")]
+        for string in glob_strings:
+            files = glob.glob(string)
+            for fname in files:
+                os.remove(fname)
+        os.chdir(WD)
+
+    def test_success(self):
+        res, outfiles = ipmag.thellier_magic(input_dir_path=self.thel_WD, n_specs=5)
+        self.assertTrue(res)
+        self.assertEqual(len(glob.glob("*.svg")), 20)
+
+    def test_success_all_specs(self):
+        res, outfiles = ipmag.thellier_magic(input_dir_path=self.thel_WD, fmt="png")
+        self.assertTrue(res)
+        self.assertEqual(len(glob.glob("*.png")), 1076)
+
+    def test_one_spec(self):
+        for fname in glob.glob("*.png"):
+            os.remove(fname)
+        res, outfiles = ipmag.thellier_magic(input_dir_path=self.thel_WD, spec="s2s0-03",
+                                             save_plots=True, fmt="png")
+        self.assertTrue(res)
+        self.assertEqual(len(glob.glob("*.png")), 4)
+        self.assertTrue(os.path.exists("s2s0-03_arai.png"))
+
+    def test_one_spec_with_output_dir(self):
+        res, outfiles = ipmag.thellier_magic(dir_path=self.thel_WD, spec="s2s0-03",
+                                             save_plots=True, fmt="png")
+        self.assertTrue(res)
+        if not set_env.IS_WIN:
+            self.assertEqual(len(glob.glob(os.path.join(self.thel_WD, "*.png"))), 4)
+            self.assertTrue(os.path.exists(os.path.join(self.thel_WD, "s2s0-03_arai.png")))
+        else:
+            self.assertEqual(len(glob.glob("*.png")), 4)
+            self.assertTrue(os.path.exists("s2s0-03_arai.png"))
 
 
 

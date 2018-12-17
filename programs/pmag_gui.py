@@ -8,11 +8,11 @@ print("-I- Importing Pmag GUI dependencies")
 import matplotlib
 if not matplotlib.get_backend() == 'WXAgg':
     matplotlib.use('WXAgg')
+import sys
 import wx
 import wx.lib.buttons as buttons
 import wx.lib.newevent as newevent
 import os
-import sys
 import webbrowser
 
 from pmagpy import pmag
@@ -694,7 +694,7 @@ class MagMainFrame(wx.Frame):
         wx.SafeYield()
         self.contribution.tables['measurements'].add_measurement_names()
         if self.data_model_num == 3:
-            res, error_message, has_problems, all_failing_items = ipmag.upload_magic(dir_path=self.WD,
+            res, error_message, has_problems, all_failing_items = ipmag.upload_magic(concat=False, dir_path=self.WD,
                                                                                      vocab=self.contribution.vocab,
                                                                                      contribution=self.contribution)
         if self.data_model_num == 2:
